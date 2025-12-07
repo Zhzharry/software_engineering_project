@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/raw-data")
@@ -17,6 +16,11 @@ import java.util.Map;
 public class RawDataController {
     
     private final RawDataService rawDataService;
+
+    @GetMapping
+    public Result<List<RawData>> getAllRawData() {
+        return rawDataService.getAllRawData();
+    }
 
     @PostMapping
     public Result<RawData> saveRawData(@RequestBody RawData rawData) {

@@ -5,18 +5,12 @@ spring:
     password: 12345
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
-      # 连接超时时间（毫秒），设置为30秒
       connection-timeout: 30000
-      # 最小空闲连接数
       minimum-idle: 1
-      # 最大连接池大小
       maximum-pool-size: 10
   
   jpa:
     hibernate:
-      # update: 自动更新数据库结构
-      # validate: 仅验证，不修改（生产环境推荐）
-      # none: 不执行任何操作
       ddl-auto: update
     show-sql: true
     properties:
@@ -31,6 +25,11 @@ spring:
 
 server:
   port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
 
 logging:
   level:

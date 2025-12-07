@@ -20,6 +20,17 @@ public class RawDataServiceImpl implements RawDataService {
     private final RawDataRepository rawDataRepository;
 
     @Override
+    public Result<List<RawData>> getAllRawData() {
+        try {
+            List<RawData> dataList = rawDataRepository.findAll();
+            return Result.success(dataList);
+        } catch (Exception e) {
+            log.error("获取所有原始数据失败: {}", e.getMessage());
+            return Result.error("获取所有原始数据失败: " + e.getMessage());
+        }
+    }
+
+    @Override
     public Result<RawData> saveRawData(RawData rawData) {
         try {
             LocalDateTime now = LocalDateTime.now();
