@@ -6,6 +6,7 @@ import com.example.module.service.ProcessedDataService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,6 +20,10 @@ public class ProcessedDataServiceImpl implements ProcessedDataService {
     @Override
     public ProcessedData save(ProcessedData processedData) {
         log.info("Saving processed data: {}", processedData);
+        // 如果是新建数据（没有id），设置创建时间
+        if (processedData.getId() == null && processedData.getCreateTime() == null) {
+            processedData.setCreateTime(LocalDateTime.now());
+        }
         return processedDataRepository.save(processedData);
     }
     
@@ -41,7 +46,7 @@ public class ProcessedDataServiceImpl implements ProcessedDataService {
     }
     
     @Override
-    public List<ProcessedData> findByRawDataId(Long rawDataId) {
+    public List<ProcessedData> findByRawDataId(String rawDataId) {
         log.debug("Finding processed data by raw data id: {}", rawDataId);
         return processedDataRepository.findByRawDataId(rawDataId);
     }

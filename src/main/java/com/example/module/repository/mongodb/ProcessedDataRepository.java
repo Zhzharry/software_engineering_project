@@ -11,13 +11,13 @@ public interface ProcessedDataRepository extends MongoRepository<ProcessedData, 
     
     List<ProcessedData> findByProcessType(String processType);
     
-    List<ProcessedData> findByRawDataId(Long rawDataId);
+    List<ProcessedData> findByRawDataId(String rawDataId);
     
     List<ProcessedData> findByConfidenceScoreGreaterThan(Double minScore);
     
     @Query("{ 'processed_content.?0' : ?1 }")
     List<ProcessedData> findByProcessedContentField(String field, Object value);
     
-    @Query("{ 'confidenceScore' : { $gte: ?0, $lte: ?1 } }")
+    @Query("{ 'confidence_score' : { $gte: ?0, $lte: ?1 } }")
     List<ProcessedData> findByConfidenceScoreBetween(Double minScore, Double maxScore);
 }

@@ -14,7 +14,7 @@ public interface ProcessedDataService {
     
     List<ProcessedData> findByProcessType(String processType);
     
-    List<ProcessedData> findByRawDataId(Long rawDataId);
+    List<ProcessedData> findByRawDataId(String rawDataId);
     
     List<ProcessedData> findByConfidenceScoreGreaterThan(Double minScore);
     

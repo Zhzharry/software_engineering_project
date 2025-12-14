@@ -56,7 +56,7 @@ public class ProcessedDataController {
     }
     
     @GetMapping("/raw-data/{rawDataId}")
-    public Result<List<ProcessedData>> getByRawDataId(@PathVariable Long rawDataId) {
+    public Result<List<ProcessedData>> getByRawDataId(@PathVariable String rawDataId) {
         try {
             List<ProcessedData> processedDataList = processedDataService.findByRawDataId(rawDataId);
             return Result.success("Processed data retrieved by raw data id", processedDataList);

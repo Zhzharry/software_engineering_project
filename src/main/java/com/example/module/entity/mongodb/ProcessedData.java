@@ -14,7 +14,7 @@ public class ProcessedData {
     private String id;
     
     @Field("raw_data_id")
-    private Long rawDataId;
+    private String rawDataId;
     
     @Field("processed_content")
     private Map<String, Object> processedContent;
