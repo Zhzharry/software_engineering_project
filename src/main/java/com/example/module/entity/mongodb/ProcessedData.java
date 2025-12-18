@@ -30,4 +30,10 @@ public class ProcessedData {
     
     @Field("metadata")
     private Map<String, Object> metadata;
+    
+    @Field("expire_time")
+    private LocalDateTime expireTime; // 数据过期时间
+    
+    @Field("retention_days")
+    private Integer retentionDays; // 保留天数
 }
