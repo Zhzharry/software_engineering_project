@@ -97,7 +97,7 @@
 
 **接口地址：** `GET /api/disaster-decode/geo/{geoCode}`
 
-**功能说明：** 根据12位地理码获取地理位置信息
+**功能说明：** 根据12位地理码获取地理位置信息（调用定位接口）
 
 **请求参数：**
 - `geoCode` (路径参数): 12位地理码
@@ -106,18 +106,71 @@
 ```json
 {
   "code": 200,
-  "message": "获取地理位置信息成功",
+  "message": "地理码定位成功",
   "data": {
-    "geoCode": "123456789012",
+    "geoCode": "510104001001",
     "longitude": 104.066,
     "latitude": 30.572,
     "province": "四川省",
     "city": "成都市",
     "district": "锦江区",
-    "address": "春熙路",
-    "formattedAddress": "四川省成都市锦江区春熙路"
+    "township": "春熙路街道",
+    "village": "某社区",
+    "provinceCode": "51",
+    "cityCode": "01",
+    "districtCode": "04",
+    "townshipCode": "001",
+    "villageCode": "001",
+    "formattedAddress": "四川省成都市锦江区春熙路街道"
   }
 }
+```
+
+### 2.1.1 根据地理码进行定位（推荐）
+
+**接口地址：** `GET /api/disaster-decode/geo/locate/{geoCode}`
+
+**功能说明：** 根据12位地理码进行精确定位，解析地理码的层级结构（省、市、县、乡镇、村），并获取完整的地理位置信息
+
+**地理码结构说明：**
+- 前2位：省、直辖市、自治区行政区划代码
+- 第3-4位：地市行政区划代码
+- 第5-6位：县区行政区划代码
+- 第7-9位：乡镇或街道代码
+- 第10-12位：行政村或社区代码
+
+**请求参数：**
+- `geoCode` (路径参数): 12位地理码
+
+**响应示例：**
+```json
+{
+  "code": 200,
+  "message": "地理码定位成功",
+  "data": {
+    "geoCode": "510104001001",
+    "longitude": 104.066,
+    "latitude": 30.572,
+    "province": "四川省",
+    "city": "成都市",
+    "district": "锦江区",
+    "township": "春熙路街道",
+    "village": "某社区",
+    "provinceCode": "51",
+    "cityCode": "01",
+    "districtCode": "04",
+    "townshipCode": "001",
+    "villageCode": "001",
+    "formattedAddress": "四川省成都市锦江区春熙路街道",
+    "address": "春熙路街道某社区"
+  }
+}
+```
+
+**使用示例：**
+```bash
+# 定位四川省成都市锦江区春熙路街道某社区
+GET /api/disaster-decode/geo/locate/510104001001
 ```
 
 ### 2.2 根据经纬度逆地理编码

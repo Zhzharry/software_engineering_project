@@ -1,6 +1,7 @@
 package com.example.module.service.impl;
 
 import com.example.module.service.GeoLocationService;
+import com.example.module.util.GeoCodeParser;
 import com.example.module.util.Result;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -33,36 +35,183 @@ public class GeoLocationServiceImpl implements GeoLocationService {
     // 高德API基础URL
     private static final String AMAP_GEOCODE_URL = "https://restapi.amap.com/v3/geocode/geo";
     private static final String AMAP_REGEOCODE_URL = "https://restapi.amap.com/v3/geocode/regeo";
+    private static final String AMAP_DISTRICT_URL = "https://restapi.amap.com/v3/config/district";
 
     @Override
     public Result<GeoLocationInfo> getLocationByGeoCode(String geoCode) {
+        // 调用新的定位方法
+        return locateByGeoCode(geoCode);
+    }
+
+    @Override
+    public Result<GeoLocationInfo> locateByGeoCode(String geoCode) {
         try {
             if (geoCode == null || geoCode.length() != 12) {
                 return Result.error("地理码必须为12位");
             }
 
-            // 注意：12位地理码需要根据实际业务规则转换为具体的地址或坐标
-            // 这里假设地理码可以直接作为地址进行地理编码
-            // 实际应用中可能需要根据地理码的编码规则进行解析
-            
-            // 如果地理码是地址编码，可以直接使用地理编码API
-            // 如果地理码是坐标编码，需要先解析出经纬度
-            
-            // 示例：假设地理码前6位是行政区划代码，后6位是其他信息
-            // 这里提供一个基础实现，实际需要根据地理码的具体编码规则调整
-            
-            // 暂时返回一个示例实现
-            // 实际应用中，需要根据地理码的编码规则解析出地址或坐标
-            log.warn("地理码解析功能需要根据实际编码规则实现，当前地理码: {}", geoCode);
+            // 解析地理码的层级结构
+            GeoCodeParser.GeoCodeInfo geoCodeInfo = GeoCodeParser.parse(geoCode);
             
             GeoLocationInfo info = new GeoLocationInfo();
             info.setGeoCode(geoCode);
-            // TODO: 根据地理码编码规则解析出具体地址或坐标
-            
-            return Result.success("地理码解析功能待完善", info);
+            info.setProvinceCode(geoCodeInfo.getProvinceCode());
+            info.setCityCode(geoCodeInfo.getCityCode());
+            info.setDistrictCode(geoCodeInfo.getDistrictCode());
+            info.setTownshipCode(geoCodeInfo.getTownshipCode());
+            info.setVillageCode(geoCodeInfo.getVillageCode());
+
+            // 使用高德地图行政区划查询API获取行政区划信息
+            // 首先查询省级信息
+            Result<GeoLocationInfo> provinceResult = queryDistrictByCode(geoCodeInfo.getProvinceLevelCode(), 1);
+            if (provinceResult.getCode() == 200 && provinceResult.getData() != null) {
+                GeoLocationInfo provinceInfo = provinceResult.getData();
+                info.setProvince(provinceInfo.getProvince());
+            }
+
+            // 查询市级信息
+            Result<GeoLocationInfo> cityResult = queryDistrictByCode(geoCodeInfo.getCityLevelCode(), 2);
+            if (cityResult.getCode() == 200 && cityResult.getData() != null) {
+                GeoLocationInfo cityInfo = cityResult.getData();
+                info.setCity(cityInfo.getCity());
+            }
+
+            // 查询县级信息
+            Result<GeoLocationInfo> districtResult = queryDistrictByCode(geoCodeInfo.getDistrictLevelCode(), 3);
+            if (districtResult.getCode() == 200 && districtResult.getData() != null) {
+                GeoLocationInfo districtInfo = districtResult.getData();
+                info.setDistrict(districtInfo.getDistrict());
+            }
+
+            // 查询乡镇级信息
+            Result<GeoLocationInfo> townshipResult = queryDistrictByCode(geoCodeInfo.getTownshipLevelCode(), 4);
+            if (townshipResult.getCode() == 200 && townshipResult.getData() != null) {
+                GeoLocationInfo townshipInfo = townshipResult.getData();
+                info.setTownship(townshipInfo.getTownship());
+            }
+
+            // 构建完整地址并获取经纬度
+            StringBuilder addressBuilder = new StringBuilder();
+            if (info.getProvince() != null && !info.getProvince().isEmpty()) {
+                addressBuilder.append(info.getProvince());
+            }
+            if (info.getCity() != null && !info.getCity().isEmpty()) {
+                addressBuilder.append(info.getCity());
+            }
+            if (info.getDistrict() != null && !info.getDistrict().isEmpty()) {
+                addressBuilder.append(info.getDistrict());
+            }
+            if (info.getTownship() != null && !info.getTownship().isEmpty()) {
+                addressBuilder.append(info.getTownship());
+            }
+
+            String address = addressBuilder.toString();
+            if (!address.isEmpty()) {
+                // 使用地理编码API获取经纬度
+                Result<GeoLocationInfo> geocodeResult = geocodeByAddress(address);
+                if (geocodeResult.getCode() == 200 && geocodeResult.getData() != null) {
+                    GeoLocationInfo geocodeInfo = geocodeResult.getData();
+                    info.setLongitude(geocodeInfo.getLongitude());
+                    info.setLatitude(geocodeInfo.getLatitude());
+                    info.setFormattedAddress(geocodeInfo.getFormattedAddress());
+                }
+            }
+
+            // 构建格式化地址
+            if (info.getFormattedAddress() == null || info.getFormattedAddress().isEmpty()) {
+                info.setFormattedAddress(address);
+            }
+
+            return Result.success("地理码定位成功", info);
         } catch (Exception e) {
-            log.error("地理码解析异常: ", e);
-            return Result.error("地理码解析失败: " + e.getMessage());
+            log.error("地理码定位异常: ", e);
+            return Result.error("地理码定位失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 根据行政区划代码查询行政区划信息
+     * 
+     * @param districtCode 行政区划代码（12位）
+     * @param level 级别（1-省，2-市，3-县，4-乡镇）
+     * @return 地理位置信息
+     */
+    private Result<GeoLocationInfo> queryDistrictByCode(String districtCode, int level) {
+        try {
+            // 构建请求参数
+            Map<String, String> params = new HashMap<>();
+            params.put("key", amapApiKey);
+            params.put("keywords", districtCode);
+            params.put("subdistrict", "0");
+            params.put("extensions", "base");
+            params.put("output", "json");
+
+            // 构建URL
+            StringBuilder urlBuilder = new StringBuilder(AMAP_DISTRICT_URL);
+            urlBuilder.append("?");
+            for (Map.Entry<String, String> entry : params.entrySet()) {
+                urlBuilder.append(entry.getKey())
+                        .append("=")
+                        .append(URLEncoder.encode(entry.getValue(), "UTF-8"))
+                        .append("&");
+            }
+            String url = urlBuilder.toString();
+
+            // 调用高德API
+            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+            String responseBody = response.getBody();
+
+            // 解析响应
+            JsonNode jsonNode = objectMapper.readTree(responseBody);
+            String status = jsonNode.path("status").asText();
+
+            if (!"1".equals(status)) {
+                String info = jsonNode.path("info").asText();
+                log.warn("高德行政区划API调用失败: {}", info);
+                return Result.error("高德API调用失败: " + info);
+            }
+
+            // 解析行政区划信息
+            JsonNode districts = jsonNode.path("districts");
+            if (districts.isArray() && districts.size() > 0) {
+                JsonNode district = districts.get(0);
+                String name = district.path("name").asText();
+                String center = district.path("center").asText(); // 格式：经度,纬度
+
+                GeoLocationInfo info = new GeoLocationInfo();
+                
+                // 根据级别设置对应的字段
+                switch (level) {
+                    case 1:
+                        info.setProvince(name);
+                        break;
+                    case 2:
+                        info.setCity(name);
+                        break;
+                    case 3:
+                        info.setDistrict(name);
+                        break;
+                    case 4:
+                        info.setTownship(name);
+                        break;
+                }
+
+                // 解析中心点坐标
+                if (center != null && !center.isEmpty() && center.contains(",")) {
+                    String[] coordinates = center.split(",");
+                    if (coordinates.length == 2) {
+                        info.setLongitude(Double.parseDouble(coordinates[0]));
+                        info.setLatitude(Double.parseDouble(coordinates[1]));
+                    }
+                }
+
+                return Result.success("查询成功", info);
+            }
+
+            return Result.error("未找到匹配的行政区划");
+        } catch (Exception e) {
+            log.warn("查询行政区划信息异常: {}", e.getMessage());
+            return Result.error("查询失败: " + e.getMessage());
         }
     }
 

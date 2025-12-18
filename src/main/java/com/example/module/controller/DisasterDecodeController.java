@@ -69,6 +69,18 @@ public class DisasterDecodeController {
     }
 
     /**
+     * 根据12位地理码进行定位
+     * 解析地理码的层级结构（省、市、县、乡镇、村），并获取地理位置信息
+     * 
+     * @param geoCode 12位地理码
+     * @return 地理位置信息（包含经纬度、各级行政区划名称等）
+     */
+    @GetMapping("/geo/locate/{geoCode}")
+    public Result<GeoLocationService.GeoLocationInfo> locateByGeoCode(@PathVariable String geoCode) {
+        return geoLocationService.locateByGeoCode(geoCode);
+    }
+
+    /**
      * 根据经纬度获取地理位置信息（逆地理编码）
      * 
      * @param longitude 经度

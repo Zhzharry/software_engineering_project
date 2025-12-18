@@ -26,6 +26,15 @@ public interface GeoLocationService {
     Result<GeoLocationInfo> getLocationByCoordinates(Double longitude, Double latitude);
 
     /**
+     * 根据12位地理码进行定位
+     * 解析地理码的层级结构（省、市、县、乡镇、村），并获取地理位置信息
+     * 
+     * @param geoCode 12位地理码
+     * @return 地理位置信息（包含经纬度、各级行政区划名称等）
+     */
+    Result<GeoLocationInfo> locateByGeoCode(String geoCode);
+
+    /**
      * 地理信息类
      */
     class GeoLocationInfo {
@@ -101,6 +110,71 @@ public interface GeoLocationService {
 
         public void setFormattedAddress(String formattedAddress) {
             this.formattedAddress = formattedAddress;
+        }
+
+        // 新增字段：行政区划层级信息
+        private String provinceCode;
+        private String cityCode;
+        private String districtCode;
+        private String townshipCode;
+        private String villageCode;
+        private String township;
+        private String village;
+
+        public String getProvinceCode() {
+            return provinceCode;
+        }
+
+        public void setProvinceCode(String provinceCode) {
+            this.provinceCode = provinceCode;
+        }
+
+        public String getCityCode() {
+            return cityCode;
+        }
+
+        public void setCityCode(String cityCode) {
+            this.cityCode = cityCode;
+        }
+
+        public String getDistrictCode() {
+            return districtCode;
+        }
+
+        public void setDistrictCode(String districtCode) {
+            this.districtCode = districtCode;
+        }
+
+        public String getTownshipCode() {
+            return townshipCode;
+        }
+
+        public void setTownshipCode(String townshipCode) {
+            this.townshipCode = townshipCode;
+        }
+
+        public String getVillageCode() {
+            return villageCode;
+        }
+
+        public void setVillageCode(String villageCode) {
+            this.villageCode = villageCode;
+        }
+
+        public String getTownship() {
+            return township;
+        }
+
+        public void setTownship(String township) {
+            this.township = township;
+        }
+
+        public String getVillage() {
+            return village;
+        }
+
+        public void setVillage(String village) {
+            this.village = village;
         }
     }
 }
