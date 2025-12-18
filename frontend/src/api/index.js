@@ -140,7 +140,21 @@ export const disasterDecodeAPI = {
   },
   decodeExcelFromPath: (filePath, idColumnIndex, descriptionColumnIndex) => api.post('/disaster-decode/file/decode-excel/path', {
     filePath, idColumnIndex, descriptionColumnIndex
-  })
+  }),
+  // 新增：基于已上传文件的解码功能
+  getDecodableFiles: () => api.get('/disaster-decode/file/decodable-files'),
+  getExcelFiles: () => api.get('/disaster-decode/file/excel-files'),
+  decodeFileById: (fileId) => api.get(`/disaster-decode/file/decode-by-id/${fileId}`),
+  decodeFilesByIds: (fileIds) => api.post('/disaster-decode/file/decode-by-ids', { fileIds }),
+  decodeExcelById: (fileId, idColumnIndex, descriptionColumnIndex, startRow, endRow) => {
+    const params = new URLSearchParams()
+    if (idColumnIndex !== undefined && idColumnIndex !== null) params.append('idColumnIndex', idColumnIndex)
+    if (descriptionColumnIndex !== undefined && descriptionColumnIndex !== null) params.append('descriptionColumnIndex', descriptionColumnIndex)
+    if (startRow !== undefined && startRow !== null) params.append('startRow', startRow)
+    if (endRow !== undefined && endRow !== null) params.append('endRow', endRow)
+    const queryString = params.toString()
+    return api.get(`/disaster-decode/file/decode-excel-by-id/${fileId}${queryString ? '?' + queryString : ''}`)
+  }
 }
 
 // 灾情数据查询API

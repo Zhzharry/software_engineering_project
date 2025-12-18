@@ -40,4 +40,12 @@ public class Result<T> implements Serializable {
     public static <T> Result<T> error(String message) {
         return error(500, message);
     }
+
+    /**
+     * 判断请求是否成功
+     * @return 如果code为200则返回true，否则返回false
+     */
+    public boolean isSuccess() {
+        return this.code != null && this.code == 200;
+    }
 }

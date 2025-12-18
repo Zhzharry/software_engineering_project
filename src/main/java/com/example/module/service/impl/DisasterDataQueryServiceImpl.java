@@ -8,8 +8,9 @@ import com.example.module.util.DecodedId;
 import com.example.module.util.Result;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Example;
-import org.springframework.data.domain.ExampleMatcher;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -27,6 +28,7 @@ public class DisasterDataQueryServiceImpl implements DisasterDataQueryService {
 
     private final RawDataRepository rawDataRepository;
     private final DisasterDecodeService disasterDecodeService;
+    private final MongoTemplate mongoTemplate;
 
     @Override
     public Result<List<RawData>> queryByDisasterCategory(String category) {
@@ -97,57 +99,40 @@ public class DisasterDataQueryServiceImpl implements DisasterDataQueryService {
     @Override
     public Result<List<RawData>> queryByMultipleConditions(DisasterQueryParams queryParams) {
         try {
-            // 构建查询条件
-            RawData example = new RawData();
-            
-            if (queryParams.getDisasterCategory() != null) {
-                example.setDisasterCategory(queryParams.getDisasterCategory());
+            // 使用MongoTemplate构建查询，正确处理@Field注解的字段名
+            Query query = new Query();
+
+            // 添加查询条件（使用MongoDB文档中的实际字段名）
+            if (queryParams.getDisasterCategory() != null && !queryParams.getDisasterCategory().isEmpty()) {
+                query.addCriteria(Criteria.where("disaster_category").is(queryParams.getDisasterCategory()));
             }
-            if (queryParams.getDisasterSubcategory() != null) {
-                example.setDisasterSubcategory(queryParams.getDisasterSubcategory());
+            if (queryParams.getDisasterSubcategory() != null && !queryParams.getDisasterSubcategory().isEmpty()) {
+                query.addCriteria(Criteria.where("disaster_subcategory").is(queryParams.getDisasterSubcategory()));
             }
-            if (queryParams.getSource() != null) {
-                example.setSourceSubcategory(queryParams.getSource());
+            if (queryParams.getSource() != null && !queryParams.getSource().isEmpty()) {
+                query.addCriteria(Criteria.where("source_subcategory").is(queryParams.getSource()));
             }
-            if (queryParams.getCarrierType() != null) {
-                example.setCarrierType(queryParams.getCarrierType());
+            if (queryParams.getCarrierType() != null && !queryParams.getCarrierType().isEmpty()) {
+                query.addCriteria(Criteria.where("carrier_type").is(queryParams.getCarrierType()));
             }
-            if (queryParams.getGeoCode() != null) {
-                example.setGeoCode(queryParams.getGeoCode());
+            if (queryParams.getGeoCode() != null && !queryParams.getGeoCode().isEmpty()) {
+                // 支持地理码前缀匹配
+                query.addCriteria(Criteria.where("geo_code").regex("^" + queryParams.getGeoCode()));
             }
 
-            ExampleMatcher matcher = ExampleMatcher.matching()
-                    .withIgnoreNullValues()
-                    .withStringMatcher(ExampleMatcher.StringMatcher.EXACT);
-
-            Example<RawData> exampleQuery = Example.of(example, matcher);
-            
-            List<RawData> dataList;
-            
-            // 如果有时间范围，需要额外过滤
-            if (queryParams.getStartTime() != null || queryParams.getEndTime() != null) {
-                dataList = rawDataRepository.findAll(exampleQuery);
-                // 手动过滤时间范围
-                List<RawData> filteredList = new ArrayList<>();
-                for (RawData data : dataList) {
-                    LocalDateTime dateTime = data.getDisasterDateTime();
-                    if (dateTime != null) {
-                        boolean inRange = true;
-                        if (queryParams.getStartTime() != null && dateTime.isBefore(queryParams.getStartTime())) {
-                            inRange = false;
-                        }
-                        if (queryParams.getEndTime() != null && dateTime.isAfter(queryParams.getEndTime())) {
-                            inRange = false;
-                        }
-                        if (inRange) {
-                            filteredList.add(data);
-                        }
-                    }
-                }
-                dataList = filteredList;
-            } else {
-                dataList = rawDataRepository.findAll(exampleQuery);
+            // 时间范围查询
+            if (queryParams.getStartTime() != null && queryParams.getEndTime() != null) {
+                query.addCriteria(Criteria.where("disaster_date_time")
+                        .gte(queryParams.getStartTime())
+                        .lte(queryParams.getEndTime()));
+            } else if (queryParams.getStartTime() != null) {
+                query.addCriteria(Criteria.where("disaster_date_time").gte(queryParams.getStartTime()));
+            } else if (queryParams.getEndTime() != null) {
+                query.addCriteria(Criteria.where("disaster_date_time").lte(queryParams.getEndTime()));
             }
+
+            // 执行查询
+            List<RawData> dataList = mongoTemplate.find(query, RawData.class);
 
             // 分页处理
             if (queryParams.getPage() != null && queryParams.getSize() != null) {

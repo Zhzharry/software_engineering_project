@@ -187,16 +187,21 @@ public class MapServiceImpl implements MapService {
     public Result<List<ClusterPoint>> getClusterPoints(Integer zoomLevel, String bounds) {
         try {
             // 解析边界
-            double minLng = 73.0, minLat = 3.0, maxLng = 136.0, maxLat = 54.0;
+            double minLngTemp = 73.0, minLatTemp = 3.0, maxLngTemp = 136.0, maxLatTemp = 54.0;
             if (StringUtils.hasText(bounds)) {
                 String[] parts = bounds.split(",");
                 if (parts.length == 4) {
-                    minLng = Double.parseDouble(parts[0]);
-                    minLat = Double.parseDouble(parts[1]);
-                    maxLng = Double.parseDouble(parts[2]);
-                    maxLat = Double.parseDouble(parts[3]);
+                    minLngTemp = Double.parseDouble(parts[0]);
+                    minLatTemp = Double.parseDouble(parts[1]);
+                    maxLngTemp = Double.parseDouble(parts[2]);
+                    maxLatTemp = Double.parseDouble(parts[3]);
                 }
             }
+            // 使用 final 变量供 lambda 使用
+            final double minLng = minLngTemp;
+            final double minLat = minLatTemp;
+            final double maxLng = maxLngTemp;
+            final double maxLat = maxLatTemp;
 
             // 根据缩放级别计算聚合半径（度数）
             double clusterRadius = calculateClusterRadius(zoomLevel != null ? zoomLevel : 5);
@@ -230,13 +235,14 @@ public class MapServiceImpl implements MapService {
         try {
             Query query = new Query();
             query.addCriteria(Criteria.where("geo_code").exists(true).ne(null).ne(""));
-            query.addCriteria(Criteria.where("disaster_date_time").exists(true).ne(null));
 
-            // 时间范围筛选
+            // 时间范围筛选 - 合并为单个条件避免重复键错误
             if (StringUtils.hasText(startTime) && StringUtils.hasText(endTime)) {
                 LocalDateTime start = LocalDateTime.parse(startTime, DateTimeFormatter.ISO_DATE_TIME);
                 LocalDateTime end = LocalDateTime.parse(endTime, DateTimeFormatter.ISO_DATE_TIME);
-                query.addCriteria(Criteria.where("disaster_date_time").gte(start).lte(end));
+                query.addCriteria(Criteria.where("disaster_date_time").exists(true).ne(null).gte(start).lte(end));
+            } else {
+                query.addCriteria(Criteria.where("disaster_date_time").exists(true).ne(null));
             }
 
             List<RawData> rawDataList = mongoTemplate.find(query, RawData.class);
@@ -361,7 +367,9 @@ public class MapServiceImpl implements MapService {
         // 尝试从地理码获取经纬度
         try {
             Result<GeoLocationService.GeoLocationInfo> geoResult = geoLocationService.locateByGeoCode(data.getGeoCode());
-            if (geoResult.isSuccess() && geoResult.getData() != null) {
+            if (geoResult.isSuccess() && geoResult.getData() != null
+                    && geoResult.getData().getLongitude() != null
+                    && geoResult.getData().getLatitude() != null) {
                 GeoLocationService.GeoLocationInfo geoInfo = geoResult.getData();
                 point.setLongitude(geoInfo.getLongitude());
                 point.setLatitude(geoInfo.getLatitude());

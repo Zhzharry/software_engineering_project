@@ -1,7 +1,9 @@
 package com.example.module.controller;
 
+import com.example.module.entity.mongodb.FileMetadata;
 import com.example.module.service.DisasterDecodeService;
 import com.example.module.service.FileDecodeService;
+import com.example.module.service.FileService;
 import com.example.module.service.GeoLocationService;
 import com.example.module.util.DecodedId;
 import com.example.module.util.Result;
@@ -23,6 +25,7 @@ public class DisasterDecodeController {
     private final DisasterDecodeService disasterDecodeService;
     private final GeoLocationService geoLocationService;
     private final FileDecodeService fileDecodeService;
+    private final FileService fileService;
 
     /**
      * 解码单个ID
@@ -146,9 +149,75 @@ public class DisasterDecodeController {
     public Result<FileDecodeService.ExcelDecodeResult> decodeExcelContentFromPath(
             @RequestBody DecodeExcelPathRequest request) {
         return fileDecodeService.decodeExcelContentFromPath(
-                request.getFilePath(), 
-                request.getIdColumnIndex(), 
+                request.getFilePath(),
+                request.getIdColumnIndex(),
                 request.getDescriptionColumnIndex());
+    }
+
+    // ========== 新增：基于已上传文件的解码功能 ==========
+
+    /**
+     * 获取可解码的文件列表（文件名包含36位数字的文件）
+     *
+     * @return 可解码的文件列表
+     */
+    @GetMapping("/file/decodable-files")
+    public Result<List<FileMetadata>> getDecodableFiles() {
+        return fileDecodeService.getDecodableFiles();
+    }
+
+    /**
+     * 获取已上传的Excel文件列表
+     *
+     * @return Excel文件列表
+     */
+    @GetMapping("/file/excel-files")
+    public Result<List<FileMetadata>> getExcelFiles() {
+        return fileDecodeService.getExcelFiles();
+    }
+
+    /**
+     * 根据文件ID解码文件名
+     * 从已上传的文件中获取文件名并解码
+     *
+     * @param fileId 文件ID
+     * @return 解码结果
+     */
+    @GetMapping("/file/decode-by-id/{fileId}")
+    public Result<FileDecodeService.FileDecodeResult> decodeFileById(@PathVariable String fileId) {
+        return fileDecodeService.decodeFileById(fileId);
+    }
+
+    /**
+     * 批量解码文件名（通过文件ID列表）
+     *
+     * @param request 包含文件ID列表的请求
+     * @return 解码结果列表
+     */
+    @PostMapping("/file/decode-by-ids")
+    public Result<List<FileDecodeService.FileDecodeResult>> decodeFilesByIds(@RequestBody DecodeFilesByIdsRequest request) {
+        return fileDecodeService.decodeFilesByIds(request.getFileIds());
+    }
+
+    /**
+     * 根据文件ID解码Excel内容
+     * 读取已上传的Excel文件并解码
+     *
+     * @param fileId 文件ID
+     * @param idColumnIndex ID列索引（从0开始，如果为null则自动查找）
+     * @param descriptionColumnIndex 描述列索引（可选）
+     * @param startRow 起始行（从1开始，包含，如果为null则从第2行开始）
+     * @param endRow 结束行（包含，如果为null则到最后一行）
+     * @return 解码结果
+     */
+    @GetMapping("/file/decode-excel-by-id/{fileId}")
+    public Result<FileDecodeService.ExcelDecodeResult> decodeExcelById(
+            @PathVariable String fileId,
+            @RequestParam(value = "idColumnIndex", required = false) Integer idColumnIndex,
+            @RequestParam(value = "descriptionColumnIndex", required = false) Integer descriptionColumnIndex,
+            @RequestParam(value = "startRow", required = false) Integer startRow,
+            @RequestParam(value = "endRow", required = false) Integer endRow) {
+        return fileDecodeService.decodeExcelById(fileId, idColumnIndex, descriptionColumnIndex, startRow, endRow);
     }
 
     /**
@@ -226,6 +295,21 @@ public class DisasterDecodeController {
 
         public void setDescriptionColumnIndex(Integer descriptionColumnIndex) {
             this.descriptionColumnIndex = descriptionColumnIndex;
+        }
+    }
+
+    /**
+     * 根据文件ID列表解码请求体
+     */
+    public static class DecodeFilesByIdsRequest {
+        private List<String> fileIds;
+
+        public List<String> getFileIds() {
+            return fileIds;
+        }
+
+        public void setFileIds(List<String> fileIds) {
+            this.fileIds = fileIds;
         }
     }
 }

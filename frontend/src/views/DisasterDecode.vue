@@ -91,11 +91,12 @@
         <!-- 文件名解码 -->
         <el-tab-pane label="文件名解码" name="filename">
           <div class="decode-section">
+            <!-- 手动输入文件名 -->
             <el-form :model="fileNameForm" label-width="120px">
               <el-form-item label="文件名">
                 <el-input
                   v-model="fileNameForm.fileName"
-                  placeholder="输入包含36位ID的文件名，如: 123456789012345678901234567890123456.jpg"
+                  placeholder="输入包含36位ID的文件名，如: 510100000000202512181200001030101001.jpg"
                   style="width: 500px;"
                 />
                 <el-button type="primary" @click="decodeFileName" :loading="fileNameLoading" style="margin-left: 10px;">
@@ -103,6 +104,43 @@
                 </el-button>
               </el-form-item>
             </el-form>
+
+            <!-- 从已上传文件选择 -->
+            <el-divider content-position="left">或从已上传文件中选择</el-divider>
+
+            <el-button type="primary" @click="loadDecodableFiles" :loading="decodableFilesLoading" style="margin-bottom: 15px;">
+              <el-icon><Refresh /></el-icon> 加载可解码文件
+            </el-button>
+
+            <el-table
+              v-if="decodableFiles.length > 0"
+              :data="decodableFiles"
+              style="width: 100%"
+              max-height="300"
+              @row-click="handleFileSelect"
+              highlight-current-row
+            >
+              <el-table-column prop="originalName" label="文件名" min-width="300" show-overflow-tooltip />
+              <el-table-column prop="fileType" label="类型" width="100" />
+              <el-table-column prop="fileSize" label="大小" width="100">
+                <template #default="{ row }">
+                  {{ formatFileSize(row.fileSize) }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="createTime" label="上传时间" width="180">
+                <template #default="{ row }">
+                  {{ formatTime(row.createTime) }}
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="100">
+                <template #default="{ row }">
+                  <el-button type="primary" link @click.stop="decodeFileById(row.id)">
+                    <el-icon><Search /></el-icon> 解码
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-empty v-else-if="decodableFilesLoaded" description="没有找到文件名包含36位灾情码的文件" />
 
             <!-- 文件名解码结果 -->
             <el-card v-if="fileNameResult" class="result-card" shadow="hover">
@@ -123,6 +161,8 @@
                 <el-descriptions-item label="灾害子类">{{ fileNameResult.decodedId?.disasterSubcategoryName }}</el-descriptions-item>
                 <el-descriptions-item label="来源">{{ fileNameResult.decodedId?.sourceCategoryName }}</el-descriptions-item>
                 <el-descriptions-item label="载体">{{ fileNameResult.decodedId?.carrierName }}</el-descriptions-item>
+                <el-descriptions-item label="时间">{{ fileNameResult.decodedId?.dateTime }}</el-descriptions-item>
+                <el-descriptions-item label="描述" :span="2">{{ fileNameResult.decodedId?.description }}</el-descriptions-item>
               </el-descriptions>
               <el-empty v-else description="文件名中未找到有效的36位ID" />
             </el-card>
@@ -132,24 +172,65 @@
         <!-- Excel解码 -->
         <el-tab-pane label="Excel解码" name="excel">
           <div class="decode-section">
-            <el-upload
-              ref="excelUploadRef"
-              :auto-upload="false"
-              :limit="1"
-              accept=".xlsx,.xls"
-              :on-change="handleExcelChange"
-              :on-remove="handleExcelRemove"
-            >
-              <template #trigger>
-                <el-button type="primary">
-                  <el-icon><Upload /></el-icon> 选择Excel文件
-                </el-button>
-              </template>
-              <template #tip>
-                <div class="el-upload__tip">只能上传 .xlsx 或 .xls 文件</div>
-              </template>
-            </el-upload>
+            <!-- 方式一：上传新文件 -->
+            <el-form-item label="上传Excel文件" label-width="120px">
+              <el-upload
+                ref="excelUploadRef"
+                :auto-upload="false"
+                :limit="1"
+                accept=".xlsx,.xls"
+                :on-change="handleExcelChange"
+                :on-remove="handleExcelRemove"
+              >
+                <template #trigger>
+                  <el-button type="primary">
+                    <el-icon><Upload /></el-icon> 选择Excel文件
+                  </el-button>
+                </template>
+                <template #tip>
+                  <div class="el-upload__tip">只能上传 .xlsx 或 .xls 文件</div>
+                </template>
+              </el-upload>
+            </el-form-item>
 
+            <!-- 方式二：从已上传文件选择 -->
+            <el-divider content-position="left">或从已上传Excel文件中选择</el-divider>
+
+            <el-button type="primary" @click="loadExcelFiles" :loading="excelFilesLoading" style="margin-bottom: 15px;">
+              <el-icon><Refresh /></el-icon> 加载已上传Excel文件
+            </el-button>
+
+            <el-table
+              v-if="excelFiles.length > 0"
+              :data="excelFiles"
+              style="width: 100%; margin-bottom: 20px;"
+              max-height="200"
+              @row-click="handleExcelFileSelect"
+              highlight-current-row
+            >
+              <el-table-column type="selection" width="55" />
+              <el-table-column prop="originalName" label="文件名" min-width="250" show-overflow-tooltip />
+              <el-table-column prop="fileSize" label="大小" width="100">
+                <template #default="{ row }">
+                  {{ formatFileSize(row.fileSize) }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="createTime" label="上传时间" width="180">
+                <template #default="{ row }">
+                  {{ formatTime(row.createTime) }}
+                </template>
+              </el-table-column>
+            </el-table>
+
+            <el-alert
+              v-if="selectedExcelFile"
+              :title="`已选择文件: ${selectedExcelFile.originalName}`"
+              type="success"
+              :closable="false"
+              style="margin-bottom: 15px;"
+            />
+
+            <!-- 解码参数 -->
             <el-form :model="excelForm" label-width="120px" style="margin-top: 20px;">
               <el-form-item label="ID列索引">
                 <el-input-number v-model="excelForm.idColumnIndex" :min="0" :max="100" placeholder="自动识别" />
@@ -159,8 +240,14 @@
                 <el-input-number v-model="excelForm.descriptionColumnIndex" :min="0" :max="100" placeholder="可选" />
                 <span class="tip">可选，用于显示描述信息</span>
               </el-form-item>
+              <el-form-item label="行范围">
+                <el-input-number v-model="excelForm.startRow" :min="1" placeholder="起始行" style="width: 120px;" />
+                <span style="margin: 0 10px;">到</span>
+                <el-input-number v-model="excelForm.endRow" :min="1" placeholder="结束行" style="width: 120px;" />
+                <span class="tip">从1开始计数，默认解码全部数据行（跳过表头）</span>
+              </el-form-item>
               <el-form-item>
-                <el-button type="primary" @click="decodeExcel" :loading="excelLoading" :disabled="!excelFile">
+                <el-button type="primary" @click="decodeExcel" :loading="excelLoading" :disabled="!excelFile && !selectedExcelFile">
                   <el-icon><DataAnalysis /></el-icon> 开始解码
                 </el-button>
               </el-form-item>
@@ -322,14 +409,26 @@ const fileNameForm = reactive({ fileName: '' })
 const fileNameLoading = ref(false)
 const fileNameResult = ref(null)
 
+// 可解码文件列表
+const decodableFiles = ref([])
+const decodableFilesLoading = ref(false)
+const decodableFilesLoaded = ref(false)
+
 // Excel解码
 const excelFile = ref(null)
 const excelForm = reactive({
   idColumnIndex: null,
-  descriptionColumnIndex: null
+  descriptionColumnIndex: null,
+  startRow: null,
+  endRow: null
 })
 const excelLoading = ref(false)
 const excelResult = ref(null)
+
+// Excel文件列表
+const excelFiles = ref([])
+const excelFilesLoading = ref(false)
+const selectedExcelFile = ref(null)
 
 // 地理码定位
 const geoForm = reactive({ geoCode: '' })
@@ -424,7 +523,7 @@ const batchDecodeIds = async () => {
   }
 }
 
-// 解码文件名
+// 解码文件名（手动输入）
 const decodeFileName = async () => {
   if (!fileNameForm.fileName) {
     ElMessage.warning('请输入文件名')
@@ -447,9 +546,58 @@ const decodeFileName = async () => {
   }
 }
 
-// Excel文件选择
+// 加载可解码文件列表
+const loadDecodableFiles = async () => {
+  decodableFilesLoading.value = true
+  try {
+    const res = await disasterDecodeAPI.getDecodableFiles()
+    if (res.data?.code === 200) {
+      decodableFiles.value = res.data.data || []
+      decodableFilesLoaded.value = true
+      if (decodableFiles.value.length === 0) {
+        ElMessage.info('没有找到文件名包含36位灾情码的文件')
+      } else {
+        ElMessage.success(`找到 ${decodableFiles.value.length} 个可解码文件`)
+      }
+    } else {
+      ElMessage.error(res.data?.message || '加载文件列表失败')
+    }
+  } catch (error) {
+    console.error('加载可解码文件失败:', error)
+    ElMessage.error('加载文件列表失败')
+  } finally {
+    decodableFilesLoading.value = false
+  }
+}
+
+// 选择文件进行解码
+const handleFileSelect = (row) => {
+  decodeFileById(row.id)
+}
+
+// 根据文件ID解码
+const decodeFileById = async (fileId) => {
+  fileNameLoading.value = true
+  try {
+    const res = await disasterDecodeAPI.decodeFileById(fileId)
+    if (res.data?.code === 200) {
+      fileNameResult.value = res.data.data
+      ElMessage.success('解码完成')
+    } else {
+      ElMessage.error(res.data?.message || '解码失败')
+    }
+  } catch (error) {
+    console.error('文件解码失败:', error)
+    ElMessage.error('文件解码失败')
+  } finally {
+    fileNameLoading.value = false
+  }
+}
+
+// Excel文件选择（上传）
 const handleExcelChange = (file) => {
   excelFile.value = file.raw
+  selectedExcelFile.value = null  // 清除已选择的服务器文件
 }
 
 const handleExcelRemove = () => {
@@ -457,21 +605,66 @@ const handleExcelRemove = () => {
   excelResult.value = null
 }
 
+// 加载已上传的Excel文件列表
+const loadExcelFiles = async () => {
+  excelFilesLoading.value = true
+  try {
+    const res = await disasterDecodeAPI.getExcelFiles()
+    if (res.data?.code === 200) {
+      excelFiles.value = res.data.data || []
+      if (excelFiles.value.length === 0) {
+        ElMessage.info('没有找到已上传的Excel文件')
+      } else {
+        ElMessage.success(`找到 ${excelFiles.value.length} 个Excel文件`)
+      }
+    } else {
+      ElMessage.error(res.data?.message || '加载Excel文件列表失败')
+    }
+  } catch (error) {
+    console.error('加载Excel文件列表失败:', error)
+    ElMessage.error('加载Excel文件列表失败')
+  } finally {
+    excelFilesLoading.value = false
+  }
+}
+
+// 选择Excel文件
+const handleExcelFileSelect = (row) => {
+  selectedExcelFile.value = row
+  excelFile.value = null  // 清除上传的文件
+  ElMessage.success(`已选择文件: ${row.originalName}`)
+}
+
 // 解码Excel
 const decodeExcel = async () => {
-  if (!excelFile.value) {
+  if (!excelFile.value && !selectedExcelFile.value) {
     ElMessage.warning('请选择Excel文件')
     return
   }
+
   excelLoading.value = true
   try {
-    const formData = new FormData()
-    formData.append('file', excelFile.value)
-    const res = await disasterDecodeAPI.decodeExcel(
-      formData,
-      excelForm.idColumnIndex,
-      excelForm.descriptionColumnIndex
-    )
+    let res
+    if (selectedExcelFile.value) {
+      // 使用已上传的文件
+      res = await disasterDecodeAPI.decodeExcelById(
+        selectedExcelFile.value.id,
+        excelForm.idColumnIndex,
+        excelForm.descriptionColumnIndex,
+        excelForm.startRow,
+        excelForm.endRow
+      )
+    } else {
+      // 上传新文件
+      const formData = new FormData()
+      formData.append('file', excelFile.value)
+      res = await disasterDecodeAPI.decodeExcel(
+        formData,
+        excelForm.idColumnIndex,
+        excelForm.descriptionColumnIndex
+      )
+    }
+
     if (res.data?.code === 200) {
       excelResult.value = res.data.data
       ElMessage.success(`解码完成: 成功 ${excelResult.value.successCount}, 失败 ${excelResult.value.failCount}`)
@@ -530,6 +723,19 @@ const reverseGeocode = async () => {
   } finally {
     reverseGeoLoading.value = false
   }
+}
+
+// 工具函数
+const formatFileSize = (bytes) => {
+  if (!bytes) return '-'
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
+}
+
+const formatTime = (time) => {
+  if (!time) return '-'
+  return new Date(time).toLocaleString('zh-CN')
 }
 </script>
 
