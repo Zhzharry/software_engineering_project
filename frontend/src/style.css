@@ -1,0 +1,177 @@
+/* 全局样式重置 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-size: 14px;
+  color: #303133;
+  background-color: #f5f7fa;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #909399;
+}
+
+::-webkit-scrollbar-track {
+  background: #f5f7fa;
+}
+
+/* 链接样式 */
+a {
+  color: #409EFF;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #66b1ff;
+}
+
+/* Element Plus 全局样式覆盖 */
+.el-card {
+  border-radius: 8px;
+  border: none;
+}
+
+.el-card__header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #ebeef5;
+  font-weight: 500;
+}
+
+.el-dialog {
+  border-radius: 8px;
+}
+
+.el-dialog__header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.el-dialog__title {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.el-table {
+  font-size: 14px;
+}
+
+.el-table th.el-table__cell {
+  background-color: #fafafa;
+  font-weight: 600;
+  color: #303133;
+}
+
+.el-pagination {
+  font-weight: normal;
+}
+
+/* 表单样式 */
+.el-form-item__label {
+  font-weight: 500;
+}
+
+/* 按钮样式增强 */
+.el-button {
+  font-weight: 500;
+}
+
+/* 面包屑样式 */
+.el-breadcrumb {
+  font-size: 14px;
+}
+
+.el-breadcrumb__inner {
+  color: #606266;
+}
+
+.el-breadcrumb__inner.is-link:hover {
+  color: #409EFF;
+}
+
+/* 标签样式增强 */
+.el-tag {
+  border-radius: 4px;
+}
+
+/* 输入框聚焦样式 */
+.el-input__wrapper:focus-within {
+  box-shadow: 0 0 0 1px #409EFF inset;
+}
+
+/* 下拉菜单样式 */
+.el-dropdown-menu__item:hover {
+  background-color: #ecf5ff;
+  color: #409EFF;
+}
+
+/* 分页器样式 */
+.el-pagination .el-select .el-input {
+  width: 100px;
+}
+
+/* 消息提示样式增强 */
+.el-message {
+  border-radius: 8px;
+}
+
+/* 确认框样式 */
+.el-message-box {
+  border-radius: 8px;
+}
+
+/* 响应式适配 */
+@media screen and (max-width: 1200px) {
+  .layout-container {
+    min-width: 1200px;
+  }
+}
+
+/* 过渡动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* 加载动画 */
+.loading-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}

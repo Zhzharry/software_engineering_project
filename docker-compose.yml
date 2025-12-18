@@ -1,0 +1,100 @@
+services:
+  # MySQL 5.7 数据库
+  mysql:
+    image: mysql:5.7
+    container_name: zaiqing-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-12345}
+      MYSQL_DATABASE: zaiqing
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./scripts/init_database.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --init-connect='SET NAMES utf8mb4'
+      --skip-character-set-client-handshake
+    networks:
+      - zaiqing-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-12345}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB 数据库
+  mongodb:
+    image: mongo:4.4
+    container_name: zaiqing-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: module_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - zaiqing-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/module_db --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Spring Boot 后端应用
+  backend:
+    # image: bohongli/zaiqing-backend:latest
+    # 本地构建时使用以下配置（注释掉 image，取消注释 build）
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zaiqing-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # MySQL 配置
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/zaiqing?useSSL=false&serverTimezone=UTC&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-12345}
+      # MongoDB 配置
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/module_db
+      SPRING_DATA_MONGODB_DATABASE: module_db
+      # JPA 配置
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - zaiqing-network
+
+  # Vue 前端
+  frontend:
+    image: bohongli/zaiqing-frontend:latest
+    # 本地构建时使用以下配置（注释掉 image，取消注释 build）
+    # build:
+    #   context: ./frontend
+    #   dockerfile: Dockerfile
+    container_name: zaiqing-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - zaiqing-network
+
+networks:
+  zaiqing-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  mongodb_data:
