@@ -46,4 +46,36 @@ public class RawData {
     
     @Field("retention_days")
     private Integer retentionDays; // 保留天数
+    
+    // ========== 解码后的字段 ==========
+    
+    @Field("disaster_id")
+    private String disasterId; // 36位灾情ID
+    
+    @Field("geo_code")
+    private String geoCode; // 地理码（12位）
+    
+    @Field("disaster_date_time")
+    private LocalDateTime disasterDateTime; // 灾情发生时间
+    
+    @Field("source_category")
+    private String sourceCategory; // 来源大类
+    
+    @Field("source_subcategory")
+    private String sourceSubcategory; // 来源子类
+    
+    @Field("carrier_type")
+    private String carrierType; // 载体类型（文字/图像/音频/视频）
+    
+    @Field("disaster_category")
+    private String disasterCategory; // 灾害大类
+    
+    @Field("disaster_subcategory")
+    private String disasterSubcategory; // 灾害子类
+    
+    @Field("disaster_indicator")
+    private String disasterIndicator; // 灾情指标
+    
+    @Field("decoded_description")
+    private String decodedDescription; // 解码后的完整描述
 }

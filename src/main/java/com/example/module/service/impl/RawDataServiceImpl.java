@@ -2,6 +2,7 @@ package com.example.module.service.impl;
 
 import com.example.module.entity.mongodb.RawData;
 import com.example.module.repository.mongodb.RawDataRepository;
+import com.example.module.service.DisasterDataProcessService;
 import com.example.module.service.RawDataService;
 import com.example.module.util.Result;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ import java.util.Optional;
 public class RawDataServiceImpl implements RawDataService {
     
     private final RawDataRepository rawDataRepository;
+    private final DisasterDataProcessService disasterDataProcessService;
 
     @Override
     public Result<List<RawData>> getAllRawData() {
@@ -44,9 +46,22 @@ public class RawDataServiceImpl implements RawDataService {
             if (rawData.getProcessed() == null) {
                 rawData.setProcessed(false);
             }
-            RawData savedData = rawDataRepository.save(rawData);
-            log.info("原始数据保存成功, ID: {}", savedData.getId());
-            return Result.success("原始数据保存成功", savedData);
+            
+            // 尝试自动解码ID
+            Result<RawData> processResult = disasterDataProcessService.processAndDecode(rawData);
+            if (processResult.getCode() == 200 && processResult.getData() != null) {
+                // 解码成功，使用解码后的数据
+                rawData = processResult.getData();
+            } else {
+                // 解码失败或未找到ID，直接保存原始数据
+                RawData savedData = rawDataRepository.save(rawData);
+                log.info("原始数据保存成功（未解码）, ID: {}", savedData.getId());
+                return Result.success("原始数据保存成功", savedData);
+            }
+            
+            // 如果解码成功，数据已经在processAndDecode中保存了
+            log.info("原始数据保存并解码成功, ID: {}", rawData.getId());
+            return Result.success("原始数据保存并解码成功", rawData);
         } catch (Exception e) {
             log.error("保存原始数据失败: {}", e.getMessage());
             return Result.error("保存原始数据失败: " + e.getMessage());
