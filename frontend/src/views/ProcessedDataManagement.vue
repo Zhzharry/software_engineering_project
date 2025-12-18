@@ -1,285 +1,578 @@
 <template>
-  <div>
-    <div class="card">
-      <div class="card-header">
-        <h2>处理数据管理</h2>
-        <button class="btn btn-primary" @click="showCreateModal">新增处理数据</button>
-      </div>
+  <div class="page-container">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <el-breadcrumb separator="/">
+        <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
+        <el-breadcrumb-item>处理数据</el-breadcrumb-item>
+      </el-breadcrumb>
+      <h2 class="page-title">处理数据管理</h2>
+    </div>
 
-      <div v-if="message" :class="['alert', messageType === 'success' ? 'alert-success' : 'alert-error']">
-        {{ message }}
-      </div>
+    <!-- 搜索区域 -->
+    <el-card class="search-card" shadow="never">
+      <el-form :inline="true" :model="searchForm" class="search-form">
+        <el-form-item label="处理类型">
+          <el-select v-model="searchForm.processType" placeholder="请选择类型" clearable style="width: 150px">
+            <el-option v-for="type in processTypes" :key="type" :label="type" :value="type" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="置信度范围">
+          <el-slider
+            v-model="searchForm.confidenceRange"
+            range
+            :min="0"
+            :max="1"
+            :step="0.1"
+            :format-tooltip="(val) => val.toFixed(1)"
+            style="width: 200px"
+          />
+        </el-form-item>
+        <el-form-item label="关键词">
+          <el-input v-model="searchForm.keyword" placeholder="搜索处理结果" clearable style="width: 180px" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
+          <el-button :icon="Refresh" @click="handleReset">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
 
-      <div v-if="loading" class="loading">加载中...</div>
-      <div v-else-if="dataList.length === 0" class="empty">暂无处理数据</div>
-      <table v-else class="table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>原始数据ID</th>
-            <th>处理类型</th>
-            <th>处理内容</th>
-            <th>置信度</th>
-            <th>创建时间</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in dataList" :key="item.id">
-            <td>{{ item.id.substring(0, 8) }}...</td>
-            <td>{{ item.rawDataId || '-' }}</td>
-            <td>{{ item.processType || '-' }}</td>
-            <td>{{ truncate(JSON.stringify(item.processedContent || {}), 30) }}</td>
-            <td>
-              <span :class="getConfidenceClass(item.confidenceScore)">
-                {{ item.confidenceScore || '-' }}
+    <!-- 操作区域 -->
+    <el-card class="table-card" shadow="never">
+      <template #header>
+        <div class="card-header">
+          <span>处理数据列表</span>
+          <div class="header-actions">
+            <el-button type="primary" :icon="Plus" @click="handleAdd">新增处理数据</el-button>
+            <el-button type="danger" :icon="Delete" :disabled="!selectedIds.length" @click="handleBatchDelete">
+              批量删除
+            </el-button>
+          </div>
+        </div>
+      </template>
+
+      <!-- 表格 -->
+      <el-table
+        v-loading="loading"
+        :data="tableData"
+        border
+        stripe
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" align="center" />
+        <el-table-column prop="id" label="ID" width="120">
+          <template #default="{ row }">
+            <el-tooltip :content="row.id" placement="top">
+              <span>{{ row.id.substring(0, 8) }}...</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column prop="rawDataId" label="关联原始数据" width="130">
+          <template #default="{ row }">
+            <el-link type="primary" @click="viewRawData(row.rawDataId)">
+              {{ row.rawDataId.substring(0, 6) }}...
+            </el-link>
+          </template>
+        </el-table-column>
+        <el-table-column prop="processType" label="处理类型" width="120">
+          <template #default="{ row }">
+            <el-tag type="info">{{ row.processType }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="confidenceScore" label="置信度" width="180">
+          <template #default="{ row }">
+            <div class="confidence-cell">
+              <el-progress
+                :percentage="row.confidenceScore * 100"
+                :color="getConfidenceColor(row.confidenceScore)"
+                :stroke-width="10"
+                :show-text="false"
+                style="width: 100px"
+              />
+              <span :style="{ color: getConfidenceColor(row.confidenceScore) }">
+                {{ (row.confidenceScore * 100).toFixed(0) }}%
               </span>
-            </td>
-            <td>{{ formatDate(item.createTime) }}</td>
-            <td>
-              <button class="btn btn-secondary btn-sm" @click="updateConfidence(item)">更新置信度</button>
-              <button class="btn btn-danger btn-sm" @click="deleteData(item.id)">删除</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="processTime" label="处理时间" width="180" />
+        <el-table-column label="操作" width="220" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" link :icon="View" @click="handleView(row)">详情</el-button>
+            <el-button type="warning" link :icon="Edit" @click="handleEditConfidence(row)">
+              修改置信度
+            </el-button>
+            <el-popconfirm title="确定要删除该数据吗？" @confirm="handleDelete(row.id)">
+              <template #reference>
+                <el-button type="danger" link :icon="Delete">删除</el-button>
+              </template>
+            </el-popconfirm>
+          </template>
+        </el-table-column>
+      </el-table>
 
-    <!-- 创建模态框 -->
-    <div v-if="showModal" class="modal" @click.self="closeModal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>新增处理数据</h2>
-          <button class="close-btn" @click="closeModal">&times;</button>
-        </div>
-        <form @submit.prevent="saveData">
-          <div class="form-group">
-            <label>原始数据ID</label>
-            <input v-model.number="form.rawDataId" type="number" />
-          </div>
-          <div class="form-group">
-            <label>处理类型</label>
-            <input v-model="form.processType" type="text" />
-          </div>
-          <div class="form-group">
-            <label>置信度 (0-1)</label>
-            <input v-model.number="form.confidenceScore" type="number" step="0.01" min="0" max="1" />
-          </div>
-          <div class="form-group">
-            <label>处理内容 (JSON格式)</label>
-            <textarea v-model="form.processedContentStr" rows="4" placeholder='{"result": "处理完成"}'></textarea>
-          </div>
-          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-            <button type="button" class="btn btn-secondary" @click="closeModal">取消</button>
-            <button type="submit" class="btn btn-primary">保存</button>
-          </div>
-        </form>
-      </div>
-    </div>
+      <!-- 空状态 -->
+      <el-empty v-if="!loading && !tableData.length" description="暂无数据" />
 
-    <!-- 更新置信度模态框 -->
-    <div v-if="showConfidenceModal" class="modal" @click.self="closeConfidenceModal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>更新置信度</h2>
-          <button class="close-btn" @click="closeConfidenceModal">&times;</button>
-        </div>
-        <form @submit.prevent="saveConfidence">
-          <div class="form-group">
-            <label>置信度 (0-1) *</label>
-            <input v-model.number="confidenceForm.score" type="number" step="0.01" min="0" max="1" required />
-          </div>
-          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-            <button type="button" class="btn btn-secondary" @click="closeConfidenceModal">取消</button>
-            <button type="submit" class="btn btn-primary">保存</button>
-          </div>
-        </form>
+      <!-- 分页 -->
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.size"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="pagination.total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handlePageChange"
+        />
       </div>
-    </div>
+    </el-card>
+
+    <!-- 新增弹窗 -->
+    <el-dialog
+      v-model="dialogVisible"
+      title="新增处理数据"
+      width="600px"
+      :close-on-click-modal="false"
+    >
+      <el-form
+        ref="formRef"
+        :model="formData"
+        :rules="formRules"
+        label-width="120px"
+      >
+        <el-form-item label="关联原始数据" prop="rawDataId">
+          <el-input v-model="formData.rawDataId" placeholder="请输入原始数据ID" />
+        </el-form-item>
+        <el-form-item label="处理类型" prop="processType">
+          <el-select v-model="formData.processType" placeholder="请选择处理类型" style="width: 100%">
+            <el-option v-for="type in processTypes" :key="type" :label="type" :value="type" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="置信度" prop="confidenceScore">
+          <el-slider
+            v-model="formData.confidenceScore"
+            :min="0"
+            :max="1"
+            :step="0.01"
+            show-input
+            :format-tooltip="(val) => (val * 100).toFixed(0) + '%'"
+          />
+        </el-form-item>
+        <el-form-item label="处理结果" prop="resultStr">
+          <el-input
+            v-model="formData.resultStr"
+            type="textarea"
+            :rows="6"
+            placeholder="请输入 JSON 格式的处理结果"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="submitLoading" @click="handleSubmit">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 修改置信度弹窗 -->
+    <el-dialog
+      v-model="confidenceDialogVisible"
+      title="修改置信度"
+      width="450px"
+      :close-on-click-modal="false"
+    >
+      <el-form label-width="80px">
+        <el-form-item label="置信度">
+          <el-slider
+            v-model="editConfidenceScore"
+            :min="0"
+            :max="1"
+            :step="0.01"
+            show-input
+            :format-tooltip="(val) => (val * 100).toFixed(0) + '%'"
+          />
+        </el-form-item>
+        <el-form-item>
+          <div class="confidence-preview">
+            <span>预览：</span>
+            <el-progress
+              :percentage="editConfidenceScore * 100"
+              :color="getConfidenceColor(editConfidenceScore)"
+              :stroke-width="14"
+              style="width: 200px"
+            />
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="confidenceDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="submitLoading" @click="handleConfidenceSubmit">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 详情弹窗 -->
+    <el-dialog
+      v-model="detailVisible"
+      title="处理数据详情"
+      width="700px"
+    >
+      <el-descriptions :column="2" border>
+        <el-descriptions-item label="ID" :span="2">{{ currentDetail.id }}</el-descriptions-item>
+        <el-descriptions-item label="关联原始数据">{{ currentDetail.rawDataId }}</el-descriptions-item>
+        <el-descriptions-item label="处理类型">
+          <el-tag type="info">{{ currentDetail.processType }}</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="置信度">
+          <div class="confidence-cell">
+            <el-progress
+              :percentage="(currentDetail.confidenceScore || 0) * 100"
+              :color="getConfidenceColor(currentDetail.confidenceScore)"
+              :stroke-width="12"
+              style="width: 120px"
+            />
+            <span :style="{ color: getConfidenceColor(currentDetail.confidenceScore), marginLeft: '10px' }">
+              {{ ((currentDetail.confidenceScore || 0) * 100).toFixed(0) }}%
+            </span>
+          </div>
+        </el-descriptions-item>
+        <el-descriptions-item label="处理时间">{{ currentDetail.processTime }}</el-descriptions-item>
+        <el-descriptions-item label="处理结果" :span="2">
+          <pre class="json-content">{{ formatJson(currentDetail.result) }}</pre>
+        </el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <el-button @click="detailVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Refresh, Plus, Delete, View, Edit } from '@element-plus/icons-vue'
 import { processedDataAPI } from '../api'
+import { USE_MOCK, mockProcessedDataAPI } from '../mock'
 
-const dataList = ref([])
+// 获取 API
+const api = USE_MOCK ? mockProcessedDataAPI : processedDataAPI
+
+// 处理类型选项
+const processTypes = ['数据清洗', '趋势分析', '风险评估', '路径预测', '数据融合', '异常检测']
+
+// 搜索表单
+const searchForm = reactive({
+  processType: '',
+  confidenceRange: [0, 1],
+  keyword: ''
+})
+
+// 表格数据
+const tableData = ref([])
 const loading = ref(false)
-const showModal = ref(false)
-const showConfidenceModal = ref(false)
-const editingId = ref(null)
-const message = ref('')
-const messageType = ref('success')
+const selectedIds = ref([])
 
-const form = ref({
-  rawDataId: null,
+// 分页
+const pagination = reactive({
+  page: 1,
+  size: 10,
+  total: 0
+})
+
+// 新增弹窗
+const dialogVisible = ref(false)
+const formRef = ref(null)
+const submitLoading = ref(false)
+const formData = reactive({
+  rawDataId: '',
   processType: '',
   confidenceScore: 0.8,
-  processedContentStr: ''
+  resultStr: ''
 })
 
-const confidenceForm = ref({
-  score: 0.8
-})
+// 修改置信度弹窗
+const confidenceDialogVisible = ref(false)
+const editConfidenceScore = ref(0.8)
+const editingId = ref(null)
 
-const loadAll = async () => {
+// 详情弹窗
+const detailVisible = ref(false)
+const currentDetail = ref({})
+
+// 表单验证规则
+const formRules = {
+  rawDataId: [{ required: true, message: '请输入原始数据ID', trigger: 'blur' }],
+  processType: [{ required: true, message: '请选择处理类型', trigger: 'change' }],
+  resultStr: [{ required: true, message: '请输入处理结果', trigger: 'blur' }]
+}
+
+// 获取置信度颜色
+const getConfidenceColor = (score) => {
+  if (!score && score !== 0) return '#909399'
+  if (score >= 0.8) return '#67C23A'
+  if (score >= 0.5) return '#E6A23C'
+  return '#F56C6C'
+}
+
+// 加载数据
+const loadData = async () => {
   loading.value = true
   try {
-    const res = await processedDataAPI.getAll()
+    const res = await api.getAll()
     if (res.data.code === 200) {
-      dataList.value = res.data.data || []
+      let data = res.data.data || []
+      // 前端筛选
+      if (searchForm.processType) {
+        data = data.filter(item => item.processType === searchForm.processType)
+      }
+      // 置信度范围筛选
+      const [minScore, maxScore] = searchForm.confidenceRange
+      data = data.filter(item =>
+        item.confidenceScore >= minScore && item.confidenceScore <= maxScore
+      )
+      // 关键词搜索
+      if (searchForm.keyword) {
+        data = data.filter(item => {
+          const resultStr = JSON.stringify(item.result || {})
+          return resultStr.includes(searchForm.keyword)
+        })
+      }
+      pagination.total = data.length
+      // 前端分页
+      const start = (pagination.page - 1) * pagination.size
+      tableData.value = data.slice(start, start + pagination.size)
     }
   } catch (error) {
-    showMessage('加载处理数据失败', 'error')
+    ElMessage.error('加载数据失败')
   } finally {
     loading.value = false
   }
 }
 
-const showCreateModal = () => {
-  form.value = { rawDataId: null, processType: '', confidenceScore: 0.8, processedContentStr: '' }
-  showModal.value = true
+// 搜索
+const handleSearch = () => {
+  pagination.page = 1
+  loadData()
 }
 
-const closeModal = () => {
-  showModal.value = false
+// 重置
+const handleReset = () => {
+  searchForm.processType = ''
+  searchForm.confidenceRange = [0, 1]
+  searchForm.keyword = ''
+  pagination.page = 1
+  loadData()
 }
 
-const saveData = async () => {
+// 选择变化
+const handleSelectionChange = (selection) => {
+  selectedIds.value = selection.map(item => item.id)
+}
+
+// 新增
+const handleAdd = () => {
+  Object.assign(formData, {
+    rawDataId: '',
+    processType: '',
+    confidenceScore: 0.8,
+    resultStr: '{\n  \n}'
+  })
+  dialogVisible.value = true
+}
+
+// 查看详情
+const handleView = (row) => {
+  currentDetail.value = { ...row }
+  detailVisible.value = true
+}
+
+// 查看原始数据
+const viewRawData = (rawDataId) => {
+  ElMessage.info(`查看原始数据: ${rawDataId}`)
+}
+
+// 修改置信度
+const handleEditConfidence = (row) => {
+  editingId.value = row.id
+  editConfidenceScore.value = row.confidenceScore
+  confidenceDialogVisible.value = true
+}
+
+// 提交置信度修改
+const handleConfidenceSubmit = async () => {
   try {
-    const processedData = {
-      rawDataId: form.value.rawDataId,
-      processType: form.value.processType,
-      confidenceScore: form.value.confidenceScore
+    submitLoading.value = true
+    await api.updateConfidence(editingId.value, editConfidenceScore.value)
+    ElMessage.success('修改成功')
+    confidenceDialogVisible.value = false
+    loadData()
+  } catch (error) {
+    ElMessage.error('修改失败')
+  } finally {
+    submitLoading.value = false
+  }
+}
+
+// 删除
+const handleDelete = async (id) => {
+  try {
+    await api.delete(id)
+    ElMessage.success('删除成功')
+    loadData()
+  } catch (error) {
+    ElMessage.error('删除失败')
+  }
+}
+
+// 批量删除
+const handleBatchDelete = async () => {
+  try {
+    await ElMessageBox.confirm(`确定要删除选中的 ${selectedIds.value.length} 条数据吗？`, '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    for (const id of selectedIds.value) {
+      await api.delete(id)
     }
-    if (form.value.processedContentStr) {
-      try {
-        processedData.processedContent = JSON.parse(form.value.processedContentStr)
-      } catch (e) {
-        showMessage('处理内容JSON格式错误', 'error')
-        return
-      }
+    ElMessage.success('批量删除成功')
+    loadData()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败')
     }
-    await processedDataAPI.create(processedData)
-    showMessage('处理数据创建成功', 'success')
-    closeModal()
-    loadAll()
-  } catch (error) {
-    showMessage(error.response?.data?.message || '操作失败', 'error')
   }
 }
 
-const updateConfidence = (item) => {
-  editingId.value = item.id
-  confidenceForm.value.score = item.confidenceScore || 0.8
-  showConfidenceModal.value = true
-}
-
-const closeConfidenceModal = () => {
-  showConfidenceModal.value = false
-  editingId.value = null
-}
-
-const saveConfidence = async () => {
+// 提交表单
+const handleSubmit = async () => {
   try {
-    await processedDataAPI.updateConfidence(editingId.value, confidenceForm.value.score)
-    showMessage('置信度更新成功', 'success')
-    closeConfidenceModal()
-    loadAll()
+    await formRef.value.validate()
+    // 解析 JSON 内容
+    let result
+    try {
+      result = JSON.parse(formData.resultStr)
+    } catch (e) {
+      ElMessage.error('处理结果必须是有效的 JSON 格式')
+      return
+    }
+    submitLoading.value = true
+    await api.create({
+      rawDataId: formData.rawDataId,
+      processType: formData.processType,
+      confidenceScore: formData.confidenceScore,
+      result
+    })
+    ElMessage.success('新增成功')
+    dialogVisible.value = false
+    loadData()
   } catch (error) {
-    showMessage('更新失败', 'error')
+    if (error !== false) {
+      ElMessage.error('操作失败')
+    }
+  } finally {
+    submitLoading.value = false
   }
 }
 
-const deleteData = async (id) => {
-  if (!confirm('确定要删除这条处理数据吗？')) return
+// 格式化 JSON
+const formatJson = (obj) => {
+  if (!obj) return '-'
   try {
-    await processedDataAPI.delete(id)
-    showMessage('删除成功', 'success')
-    loadAll()
-  } catch (error) {
-    showMessage('删除失败', 'error')
+    return JSON.stringify(obj, null, 2)
+  } catch (e) {
+    return String(obj)
   }
 }
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('zh-CN')
+// 分页大小变化
+const handleSizeChange = () => {
+  pagination.page = 1
+  loadData()
 }
 
-const truncate = (str, len) => {
-  if (!str) return '-'
-  return str.length > len ? str.substring(0, len) + '...' : str
-}
-
-const getConfidenceClass = (score) => {
-  if (!score) return 'badge-gray'
-  if (score >= 0.8) return 'badge-success'
-  if (score >= 0.6) return 'badge-warn'
-  return 'badge-danger'
-}
-
-const showMessage = (msg, type = 'success') => {
-  message.value = msg
-  messageType.value = type
-  setTimeout(() => {
-    message.value = ''
-  }, 3000)
+// 页码变化
+const handlePageChange = () => {
+  loadData()
 }
 
 onMounted(() => {
-  loadAll()
+  loadData()
 })
 </script>
 
 <style scoped>
+.page-container {
+  padding: 0;
+}
+
+.page-header {
+  margin-bottom: 20px;
+}
+
+.page-title {
+  margin: 10px 0 0 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.search-card {
+  margin-bottom: 20px;
+}
+
+.search-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.table-card {
+  margin-bottom: 20px;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
 }
 
-.card-header h2 {
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.confidence-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.confidence-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.json-content {
   margin: 0;
-  color: #2d3748;
-}
-
-.btn-sm {
-  padding: 6px 12px;
-  font-size: 12px;
-}
-
-.badge-success {
-  padding: 4px 8px;
-  background: #c6f6d5;
-  color: #22543d;
+  padding: 12px;
+  background: #f5f7fa;
   border-radius: 4px;
-  font-size: 12px;
-}
-
-.badge-warn {
-  padding: 4px 8px;
-  background: #faf089;
-  color: #744210;
-  border-radius: 4px;
-  font-size: 12px;
-}
-
-.badge-danger {
-  padding: 4px 8px;
-  background: #fed7d7;
-  color: #742a2a;
-  border-radius: 4px;
-  font-size: 12px;
-}
-
-.badge-gray {
-  padding: 4px 8px;
-  background: #e2e8f0;
-  color: #4a5568;
-  border-radius: 4px;
-  font-size: 12px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 300px;
+  overflow-y: auto;
 }
 </style>
-

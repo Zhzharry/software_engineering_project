@@ -1,213 +1,397 @@
 <template>
-  <div>
-    <div class="card">
-      <div class="card-header">
-        <h2>用户管理</h2>
-        <button class="btn btn-primary" @click="showCreateModal">新增用户</button>
-      </div>
-
-      <div v-if="message" :class="['alert', messageType === 'success' ? 'alert-success' : 'alert-error']">
-        {{ message }}
-      </div>
-
-      <div v-if="loading" class="loading">加载中...</div>
-      <div v-else-if="users.length === 0" class="empty">暂无用户数据</div>
-      <table v-else class="table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>用户名</th>
-            <th>邮箱</th>
-            <th>手机号</th>
-            <th>状态</th>
-            <th>创建时间</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="user in users" :key="user.id">
-            <td>{{ user.id }}</td>
-            <td>{{ user.username }}</td>
-            <td>{{ user.email || '-' }}</td>
-            <td>{{ user.phone || '-' }}</td>
-            <td>
-              <span :class="user.status === 1 ? 'badge-success' : 'badge-danger'">
-                {{ user.status === 1 ? '启用' : '禁用' }}
-              </span>
-            </td>
-            <td>{{ formatDate(user.createTime) }}</td>
-            <td>
-              <button class="btn btn-secondary btn-sm" @click="editUser(user)">编辑</button>
-              <button class="btn btn-danger btn-sm" @click="deleteUser(user.id)">删除</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+  <div class="page-container">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <el-breadcrumb separator="/">
+        <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
+        <el-breadcrumb-item>用户管理</el-breadcrumb-item>
+      </el-breadcrumb>
+      <h2 class="page-title">用户管理</h2>
     </div>
 
-    <!-- 创建/编辑模态框 -->
-    <div v-if="showModal" class="modal" @click.self="closeModal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>{{ editingUser ? '编辑用户' : '新增用户' }}</h2>
-          <button class="close-btn" @click="closeModal">&times;</button>
+    <!-- 搜索区域 -->
+    <el-card class="search-card" shadow="never">
+      <el-form :inline="true" :model="searchForm" class="search-form">
+        <el-form-item label="用户名">
+          <el-input v-model="searchForm.username" placeholder="请输入用户名" clearable style="width: 200px" />
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="searchForm.status" placeholder="请选择状态" clearable style="width: 150px">
+            <el-option label="启用" :value="1" />
+            <el-option label="禁用" :value="0" />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
+          <el-button :icon="Refresh" @click="handleReset">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
+    <!-- 操作区域 -->
+    <el-card class="table-card" shadow="never">
+      <template #header>
+        <div class="card-header">
+          <span>用户列表</span>
+          <div class="header-actions">
+            <el-button type="primary" :icon="Plus" @click="handleAdd">新增用户</el-button>
+            <el-button type="danger" :icon="Delete" :disabled="!selectedIds.length" @click="handleBatchDelete">
+              批量删除
+            </el-button>
+          </div>
         </div>
-        <form @submit.prevent="saveUser">
-          <div class="form-group">
-            <label>用户名 *</label>
-            <input v-model="form.username" type="text" required />
-          </div>
-          <div class="form-group">
-            <label>邮箱</label>
-            <input v-model="form.email" type="email" />
-          </div>
-          <div class="form-group">
-            <label>手机号</label>
-            <input v-model="form.phone" type="tel" />
-          </div>
-          <div class="form-group">
-            <label>状态</label>
-            <select v-model="form.status">
-              <option :value="1">启用</option>
-              <option :value="0">禁用</option>
-            </select>
-          </div>
-          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-            <button type="button" class="btn btn-secondary" @click="closeModal">取消</button>
-            <button type="submit" class="btn btn-primary">保存</button>
-          </div>
-        </form>
+      </template>
+
+      <!-- 表格 -->
+      <el-table
+        v-loading="loading"
+        :data="tableData"
+        border
+        stripe
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" align="center" />
+        <el-table-column prop="id" label="ID" width="80" align="center" />
+        <el-table-column prop="username" label="用户名" min-width="120" />
+        <el-table-column prop="email" label="邮箱" min-width="180">
+          <template #default="{ row }">
+            {{ row.email || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="phone" label="手机号" width="130">
+          <template #default="{ row }">
+            {{ row.phone || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 1 ? 'success' : 'danger'">
+              {{ row.status === 1 ? '启用' : '禁用' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="createTime" label="创建时间" width="180" />
+        <el-table-column label="操作" width="200" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" link :icon="Edit" @click="handleEdit(row)">编辑</el-button>
+            <el-button
+              type="primary"
+              link
+              :icon="row.status === 1 ? 'VideoPause' : 'VideoPlay'"
+              @click="handleToggleStatus(row)"
+            >
+              {{ row.status === 1 ? '禁用' : '启用' }}
+            </el-button>
+            <el-popconfirm title="确定要删除该用户吗？" @confirm="handleDelete(row.id)">
+              <template #reference>
+                <el-button type="danger" link :icon="Delete">删除</el-button>
+              </template>
+            </el-popconfirm>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <!-- 空状态 -->
+      <el-empty v-if="!loading && !tableData.length" description="暂无数据" />
+
+      <!-- 分页 -->
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.size"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="pagination.total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handlePageChange"
+        />
       </div>
-    </div>
+    </el-card>
+
+    <!-- 新增/编辑弹窗 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="dialogType === 'add' ? '新增用户' : '编辑用户'"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <el-form
+        ref="formRef"
+        :model="formData"
+        :rules="formRules"
+        label-width="80px"
+      >
+        <el-form-item label="用户名" prop="username">
+          <el-input v-model="formData.username" placeholder="请输入用户名" />
+        </el-form-item>
+        <el-form-item label="邮箱" prop="email">
+          <el-input v-model="formData.email" placeholder="请输入邮箱" />
+        </el-form-item>
+        <el-form-item label="手机号" prop="phone">
+          <el-input v-model="formData.phone" placeholder="请输入手机号" />
+        </el-form-item>
+        <el-form-item label="状态" prop="status">
+          <el-radio-group v-model="formData.status">
+            <el-radio :value="1">启用</el-radio>
+            <el-radio :value="0">禁用</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="submitLoading" @click="handleSubmit">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Refresh, Plus, Delete, Edit } from '@element-plus/icons-vue'
 import { userAPI } from '../api'
+import { USE_MOCK, mockUserAPI } from '../mock'
 
-const users = ref([])
+// 获取 API（根据配置选择 Mock 或真实 API）
+const api = USE_MOCK ? mockUserAPI : userAPI
+
+// 搜索表单
+const searchForm = reactive({
+  username: '',
+  status: ''
+})
+
+// 表格数据
+const tableData = ref([])
 const loading = ref(false)
-const showModal = ref(false)
-const editingUser = ref(null)
-const message = ref('')
-const messageType = ref('success')
+const selectedIds = ref([])
 
-const form = ref({
+// 分页
+const pagination = reactive({
+  page: 1,
+  size: 10,
+  total: 0
+})
+
+// 弹窗相关
+const dialogVisible = ref(false)
+const dialogType = ref('add')
+const formRef = ref(null)
+const submitLoading = ref(false)
+const formData = reactive({
   username: '',
   email: '',
   phone: '',
   status: 1
 })
 
-const loadUsers = async () => {
+// 表单验证规则
+const formRules = {
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 2, max: 20, message: '长度在 2 到 20 个字符', trigger: 'blur' }
+  ],
+  email: [
+    { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
+  ],
+  phone: [
+    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
+  ]
+}
+
+// 加载数据
+const loadData = async () => {
   loading.value = true
   try {
-    const res = await userAPI.getAll()
+    const res = await api.getAll()
     if (res.data.code === 200) {
-      users.value = res.data.data || []
+      let data = res.data.data || []
+      // 前端筛选
+      if (searchForm.username) {
+        data = data.filter(item => item.username.includes(searchForm.username))
+      }
+      if (searchForm.status !== '') {
+        data = data.filter(item => item.status === searchForm.status)
+      }
+      pagination.total = data.length
+      // 前端分页
+      const start = (pagination.page - 1) * pagination.size
+      tableData.value = data.slice(start, start + pagination.size)
     }
   } catch (error) {
-    showMessage('加载用户列表失败', 'error')
+    ElMessage.error('加载数据失败')
   } finally {
     loading.value = false
   }
 }
 
-const showCreateModal = () => {
-  editingUser.value = null
-  form.value = { username: '', email: '', phone: '', status: 1 }
-  showModal.value = true
+// 搜索
+const handleSearch = () => {
+  pagination.page = 1
+  loadData()
 }
 
-const editUser = (user) => {
-  editingUser.value = user
-  form.value = { ...user }
-  showModal.value = true
+// 重置
+const handleReset = () => {
+  searchForm.username = ''
+  searchForm.status = ''
+  pagination.page = 1
+  loadData()
 }
 
-const closeModal = () => {
-  showModal.value = false
-  editingUser.value = null
+// 选择变化
+const handleSelectionChange = (selection) => {
+  selectedIds.value = selection.map(item => item.id)
 }
 
-const saveUser = async () => {
+// 新增
+const handleAdd = () => {
+  dialogType.value = 'add'
+  Object.assign(formData, { username: '', email: '', phone: '', status: 1 })
+  dialogVisible.value = true
+}
+
+// 编辑
+const handleEdit = (row) => {
+  dialogType.value = 'edit'
+  Object.assign(formData, { ...row })
+  dialogVisible.value = true
+}
+
+// 切换状态
+const handleToggleStatus = async (row) => {
+  const newStatus = row.status === 1 ? 0 : 1
+  const statusText = newStatus === 1 ? '启用' : '禁用'
   try {
-    if (editingUser.value) {
-      await userAPI.update(editingUser.value.id, form.value)
-      showMessage('用户更新成功', 'success')
-    } else {
-      await userAPI.create(form.value)
-      showMessage('用户创建成功', 'success')
+    await ElMessageBox.confirm(`确定要${statusText}该用户吗？`, '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await api.update(row.id, { ...row, status: newStatus })
+    ElMessage.success(`${statusText}成功`)
+    loadData()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('操作失败')
     }
-    closeModal()
-    loadUsers()
-  } catch (error) {
-    showMessage(error.response?.data?.message || '操作失败', 'error')
   }
 }
 
-const deleteUser = async (id) => {
-  if (!confirm('确定要删除这个用户吗？')) return
+// 删除
+const handleDelete = async (id) => {
   try {
-    await userAPI.delete(id)
-    showMessage('用户删除成功', 'success')
-    loadUsers()
+    await api.delete(id)
+    ElMessage.success('删除成功')
+    loadData()
   } catch (error) {
-    showMessage('删除失败', 'error')
+    ElMessage.error('删除失败')
   }
 }
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('zh-CN')
+// 批量删除
+const handleBatchDelete = async () => {
+  try {
+    await ElMessageBox.confirm(`确定要删除选中的 ${selectedIds.value.length} 个用户吗？`, '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    for (const id of selectedIds.value) {
+      await api.delete(id)
+    }
+    ElMessage.success('批量删除成功')
+    loadData()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败')
+    }
+  }
 }
 
-const showMessage = (msg, type = 'success') => {
-  message.value = msg
-  messageType.value = type
-  setTimeout(() => {
-    message.value = ''
-  }, 3000)
+// 提交表单
+const handleSubmit = async () => {
+  try {
+    await formRef.value.validate()
+    submitLoading.value = true
+    if (dialogType.value === 'add') {
+      await api.create(formData)
+      ElMessage.success('新增成功')
+    } else {
+      await api.update(formData.id, formData)
+      ElMessage.success('更新成功')
+    }
+    dialogVisible.value = false
+    loadData()
+  } catch (error) {
+    if (error !== false) {
+      ElMessage.error('操作失败')
+    }
+  } finally {
+    submitLoading.value = false
+  }
+}
+
+// 分页大小变化
+const handleSizeChange = () => {
+  pagination.page = 1
+  loadData()
+}
+
+// 页码变化
+const handlePageChange = () => {
+  loadData()
 }
 
 onMounted(() => {
-  loadUsers()
+  loadData()
 })
 </script>
 
 <style scoped>
+.page-container {
+  padding: 0;
+}
+
+.page-header {
+  margin-bottom: 20px;
+}
+
+.page-title {
+  margin: 10px 0 0 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.search-card {
+  margin-bottom: 20px;
+}
+
+.search-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.table-card {
+  margin-bottom: 20px;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
 }
 
-.card-header h2 {
-  margin: 0;
-  color: #2d3748;
+.header-actions {
+  display: flex;
+  gap: 10px;
 }
 
-.btn-sm {
-  padding: 6px 12px;
-  font-size: 12px;
-}
-
-.badge-success {
-  padding: 4px 8px;
-  background: #c6f6d5;
-  color: #22543d;
-  border-radius: 4px;
-  font-size: 12px;
-}
-
-.badge-danger {
-  padding: 4px 8px;
-  background: #fed7d7;
-  color: #742a2a;
-  border-radius: 4px;
-  font-size: 12px;
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>
-
