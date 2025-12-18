@@ -62,6 +62,10 @@
               <el-icon><DataLine /></el-icon>
               <template #title>灾情查询</template>
             </el-menu-item>
+            <el-menu-item index="/map">
+              <el-icon><MapLocation /></el-icon>
+              <template #title>地图可视化</template>
+            </el-menu-item>
           </el-sub-menu>
 
           <!-- 数据管理 -->
@@ -131,7 +135,7 @@ import {
   User, Menu, Document, DataAnalysis, Notebook,
   UserFilled, ArrowDown, Setting, SwitchButton,
   Fold, Expand, Odometer, Warning, Search, DataLine,
-  Folder, Files, Box, Delete
+  Folder, Files, Box, Delete, MapLocation
 } from '@element-plus/icons-vue'
 
 const route = useRoute()

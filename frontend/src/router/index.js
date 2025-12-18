@@ -10,6 +10,7 @@ import DisasterDecode from '../views/DisasterDecode.vue'
 import DisasterData from '../views/DisasterData.vue'
 import StorageStrategy from '../views/StorageStrategy.vue'
 import DataEviction from '../views/DataEviction.vue'
+import MapVisualization from '../views/MapVisualization.vue'
 
 const routes = [
   {
@@ -70,6 +71,11 @@ const routes = [
     path: '/data-eviction',
     name: 'DataEviction',
     component: DataEviction
+  },
+  {
+    path: '/map',
+    name: 'MapVisualization',
+    component: MapVisualization
   }
 ]
 

@@ -1,6 +1,6 @@
-# 多源数据管理系统
+# 灾情数据管理系统
 
-灾情/危机数据管理系统，支持多源数据的存储、处理和查询。
+多源灾情数据管理系统，支持灾情数据的存储、解码、查询、可视化和管理。
 
 ## 快速运行指南
 
@@ -39,25 +39,9 @@ docker-compose up -d --build
 docker-compose down -v
 ```
 
-> **注意**：首次启动前，请确保 Docker Desktop 已运行，并配置了镜像加速器（详见下方"Docker 镜像加速"章节）。
-
 ---
 
-### 方式二：仅运行前端（Mock 模式）
-
-**无需配置数据库**，前端内置 Mock 数据可独立运行：
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-访问 http://localhost:5173 即可看到完整界面。
-
----
-
-### 方式三：本地完整运行（前端 + 后端 + 数据库）
+### 方式二：本地完整运行（前端 + 后端 + 数据库）
 
 #### 第一步：启动数据库
 
@@ -102,19 +86,51 @@ java -jar target/module-1.0.0.jar
 
 后端运行在 http://localhost:8080
 
-#### 第四步：启动前端（连接真实后端）
+#### 第四步：启动前端
 
 ```bash
 cd frontend
 npm install
-
-# 创建环境配置，关闭 Mock
-echo "VITE_USE_MOCK=false" > .env.local
-
 npm run dev
 ```
 
 前端运行在 http://localhost:5173
+
+---
+
+## 功能模块
+
+### 数据看板
+- 系统数据概览统计
+- 数据类型分布图表
+- 数据趋势分析
+- 最近活动记录
+
+### 灾情中心
+- **灾情解码** - 36位灾情ID解码、批量解码、Excel文件解码、地理位置查询
+- **灾情查询** - 按类别/来源/载体/区域/时间多条件查询灾情数据
+
+### 数据管理
+- **原始数据** - 多源数据采集与存储
+- **处理数据** - 数据处理与置信度评估
+- **日志管理** - 系统日志查看与统计
+
+### 文件管理
+- 文件上传/下载/预览
+- 多格式支持（图片、文档、视频、音频）
+- 文件统计分析
+
+### 系统设置
+- **用户管理** - 用户增删改查、状态管理
+- **模块管理** - 系统模块配置
+- **存储策略** - 数据存储策略配置
+- **数据淘汰** - 过期数据清理
+
+### 地图可视化
+- 灾情点位分布展示
+- 区域统计热力图
+- 时间轴动态展示
+- 聚合点显示
 
 ---
 
@@ -124,18 +140,31 @@ npm run dev
 ├── src/                    # 后端代码 (Spring Boot)
 │   └── main/
 │       ├── java/           # Java 源码
+│       │   └── com/example/module/
+│       │       ├── controller/    # 控制器
+│       │       ├── service/       # 服务层
+│       │       ├── entity/        # 实体类
+│       │       ├── repository/    # 数据访问层
+│       │       └── util/          # 工具类
 │       └── resources/      # 配置文件
 ├── frontend/               # 前端代码 (Vue 3)
 │   ├── src/
 │   │   ├── api/           # API 接口
-│   │   ├── mock/          # Mock 数据
 │   │   ├── views/         # 页面组件
-│   │   └── components/    # 公共组件
-│   ├── Dockerfile         # 前端 Docker 构建文件
-│   ├── nginx.conf         # Nginx 配置（生产环境）
+│   │   │   ├── Dashboard.vue         # 数据看板
+│   │   │   ├── DisasterDecode.vue    # 灾情解码
+│   │   │   ├── DisasterData.vue      # 灾情查询
+│   │   │   ├── FileManagement.vue    # 文件管理
+│   │   │   ├── StorageStrategy.vue   # 存储策略
+│   │   │   ├── DataEviction.vue      # 数据淘汰
+│   │   │   └── ...
+│   │   ├── components/    # 公共组件
+│   │   └── router/        # 路由配置
 │   └── package.json
 ├── scripts/
-│   └── init_database.sql  # 数据库初始化脚本
+│   ├── init_database.sql          # 数据库初始化脚本
+│   ├── 接口测试文档.md            # API 文档
+│   └── 灾情解码API文档.md         # 灾情解码 API 文档
 ├── Dockerfile             # 后端 Docker 构建文件
 ├── docker-compose.yml     # Docker Compose 编排文件
 ├── pom.xml                # Maven 配置
@@ -146,19 +175,32 @@ npm run dev
 
 | 层级 | 技术 |
 |------|------|
-| 前端 | Vue 3 + Element Plus + Vite |
+| 前端 | Vue 3 + Element Plus + Vite + ECharts |
 | 后端 | Spring Boot 2.7 + Spring Data JPA/MongoDB |
-| 数据库 | MySQL 5.7 / MongoDB 4.4 |
+| 数据库 | MySQL 5.7 + MongoDB 4.4 |
+| 文件存储 | MongoDB GridFS |
 | 容器化 | Docker + Docker Compose |
 | Web 服务器 | Nginx（生产环境） |
 
-## 功能模块
+## API 接口
 
-- **用户管理** - 用户增删改查、状态管理
-- **模块管理** - 系统模块配置
-- **原始数据** - 多源数据采集与存储
-- **处理数据** - 数据处理与置信度评估
-- **日志管理** - 系统日志查看与统计
+### 核心接口
+| 模块 | 接口前缀 | 说明 |
+|------|---------|------|
+| 用户管理 | `/api/users` | 用户CRUD |
+| 模块管理 | `/api/modules` | 模块CRUD |
+| 原始数据 | `/api/raw-data` | 原始数据管理 |
+| 处理数据 | `/api/processed-data` | 处理数据管理 |
+| 日志数据 | `/api/log-data` | 日志管理 |
+| 文件管理 | `/api/files` | 文件上传下载 |
+| 数据看板 | `/api/dashboard` | 统计数据 |
+| 灾情解码 | `/api/disaster-decode` | ID解码、地理编码 |
+| 灾情查询 | `/api/disaster-data` | 灾情数据查询 |
+| 存储策略 | `/api/storage-strategy` | 策略配置 |
+| 数据淘汰 | `/api/data-eviction` | 数据清理 |
+| 地图可视化 | `/api/map` | 地图数据 |
+
+详细接口文档见 [scripts/接口测试文档.md](./scripts/接口测试文档.md)
 
 ## 端口说明
 
@@ -212,20 +254,11 @@ A: Docker Hub 连接超时，请配置镜像加速器（见上方说明）
 **Q: 前端启动后页面空白？**
 A: 检查是否执行了 `npm install`
 
-**Q: 前端显示"加载数据失败"？**
-A:
-- Docker 模式：检查后端容器是否正常运行 `docker-compose ps`
-- 开发模式：如果配置了 `VITE_USE_MOCK=false`，需要确保后端已启动
+**Q: 前端显示"网络错误"或"加载数据失败"？**
+A: 确保后端服务已启动，检查 `docker-compose ps` 或后端控制台
 
 **Q: 后端启动失败？**
 A: 检查 MySQL 和 MongoDB 是否启动，以及 `application.yml` 中的连接配置是否正确
-
-**Q: Docker 环境中文显示乱码？**
-A: 已在 docker-compose.yml 中配置 MySQL 强制使用 UTF-8 字符集。如仍有问题，执行：
-```bash
-docker-compose down -v
-docker-compose up -d
-```
 
 **Q: 如何查看后端日志？**
 A:
@@ -239,21 +272,8 @@ docker logs -f zaiqing-backend
 
 ---
 
-## API 文档
+## 相关文档
 
-详见 [scripts/接口测试文档.md](./scripts/接口测试文档.md)
-
-## 数据库配置
-
-详见 [README_数据库配置说明.md](./README_数据库配置说明.md)
-
----
-
-## 更新日志
-
-### 2025-12-07
-- 添加 Docker 部署支持（Dockerfile, docker-compose.yml）
-- 修复 MySQL 中文乱码问题（配置强制 UTF-8 字符集）
-- 修复原始数据 API 缺少 GET 全部数据接口的问题
-- 修复前端模块管理字段映射问题（moduleName → name）
-- 添加 Nginx 反向代理配置
+- [接口测试文档](./scripts/接口测试文档.md)
+- [灾情解码API文档](./scripts/灾情解码API文档.md)
+- [数据库配置说明](./README_数据库配置说明.md)
