@@ -1,53 +1,19 @@
 <template>
-  <div>
-    <div class="card">
-      <div class="card-header">
-        <h2>模块管理</h2>
-        <button class="btn btn-primary" @click="showCreateModal">新增模块</button>
-      </div>
-
-      <div v-if="message" :class="['alert', messageType === 'success' ? 'alert-success' : 'alert-error']">
-        {{ message }}
-      </div>
-
-      <div v-if="loading" class="loading">加载中...</div>
-      <div v-else-if="modules.length === 0" class="empty">暂无模块数据</div>
-      <table v-else class="table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>模块名称</th>
-            <th>描述</th>
-            <th>状态</th>
-            <th>创建时间</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="module in modules" :key="module.id">
-            <td>{{ module.id }}</td>
-            <td>{{ module.name }}</td>
-            <td>{{ module.description || '-' }}</td>
-            <td>
-              <span :class="module.status === 1 ? 'badge-success' : 'badge-danger'">
-                {{ module.status === 1 ? '启用' : '禁用' }}
-              </span>
-            </td>
-            <td>{{ formatDate(module.createTime) }}</td>
-            <td>
-              <button class="btn btn-secondary btn-sm" @click="editModule(module)">编辑</button>
-              <button class="btn btn-danger btn-sm" @click="deleteModule(module.id)">删除</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+  <div class="page-container">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <el-breadcrumb separator="/">
+        <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
+        <el-breadcrumb-item>模块管理</el-breadcrumb-item>
+      </el-breadcrumb>
+      <h2 class="page-title">模块管理</h2>
     </div>
 
     <!-- 搜索区域 -->
     <el-card class="search-card" shadow="never">
       <el-form :inline="true" :model="searchForm" class="search-form">
         <el-form-item label="模块名称">
-          <el-input v-model="searchForm.name" placeholder="请输入模块名称" clearable style="width: 200px" />
+          <el-input v-model="searchForm.moduleName" placeholder="请输入模块名称" clearable style="width: 200px" />
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="searchForm.status" placeholder="请选择状态" clearable style="width: 150px">
@@ -86,7 +52,7 @@
       >
         <el-table-column type="selection" width="55" align="center" />
         <el-table-column prop="id" label="ID" width="80" align="center" />
-        <el-table-column prop="name" label="模块名称" min-width="150" />
+        <el-table-column prop="moduleName" label="模块名称" min-width="150" />
         <el-table-column prop="description" label="描述" min-width="250" show-overflow-tooltip />
         <el-table-column prop="status" label="状态" width="100" align="center">
           <template #default="{ row }">
@@ -145,8 +111,8 @@
         :rules="formRules"
         label-width="100px"
       >
-        <el-form-item label="模块名称" prop="name">
-          <el-input v-model="formData.name" placeholder="请输入模块名称" />
+        <el-form-item label="模块名称" prop="moduleName">
+          <el-input v-model="formData.moduleName" placeholder="请输入模块名称" />
         </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input
@@ -172,25 +138,25 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Refresh, Plus, Delete, Edit } from '@element-plus/icons-vue'
 import { moduleAPI } from '../api'
+import { USE_MOCK, mockModuleAPI } from '../mock'
 
 // 获取 API
 const api = USE_MOCK ? mockModuleAPI : moduleAPI
 
 // 搜索表单
 const searchForm = reactive({
-  name: '',
+  moduleName: '',
   status: ''
 })
 
 // 表格数据
 const tableData = ref([])
 const loading = ref(false)
-const showModal = ref(false)
-const editingModule = ref(null)
-const message = ref('')
-const messageType = ref('success')
+const selectedIds = ref([])
 
 // 分页
 const pagination = reactive({
@@ -205,14 +171,14 @@ const dialogType = ref('add')
 const formRef = ref(null)
 const submitLoading = ref(false)
 const formData = reactive({
-  name: '',
+  moduleName: '',
   description: '',
   status: 1
 })
 
 // 表单验证规则
 const formRules = {
-  name: [
+  moduleName: [
     { required: true, message: '请输入模块名称', trigger: 'blur' },
     { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
   ],
@@ -225,12 +191,12 @@ const formRules = {
 const loadData = async () => {
   loading.value = true
   try {
-    const res = await moduleAPI.getAll()
+    const res = await api.getAll(0, 1000)
     if (res.data.code === 200) {
       let data = res.data.data?.content || res.data.data || []
       // 前端筛选
-      if (searchForm.name) {
-        data = data.filter(item => item.name.includes(searchForm.name))
+      if (searchForm.moduleName) {
+        data = data.filter(item => item.moduleName.includes(searchForm.moduleName))
       }
       if (searchForm.status !== '') {
         data = data.filter(item => item.status === searchForm.status)
@@ -241,35 +207,35 @@ const loadData = async () => {
       tableData.value = data.slice(start, start + pagination.size)
     }
   } catch (error) {
-    showMessage('加载模块列表失败', 'error')
+    ElMessage.error('加载数据失败')
   } finally {
     loading.value = false
   }
 }
 
-const showCreateModal = () => {
-  editingModule.value = null
-  form.value = { name: '', description: '', status: 1 }
-  showModal.value = true
+// 搜索
+const handleSearch = () => {
+  pagination.page = 1
+  loadData()
 }
 
 // 重置
 const handleReset = () => {
-  searchForm.name = ''
+  searchForm.moduleName = ''
   searchForm.status = ''
   pagination.page = 1
   loadData()
 }
 
-const closeModal = () => {
-  showModal.value = false
-  editingModule.value = null
+// 选择变化
+const handleSelectionChange = (selection) => {
+  selectedIds.value = selection.map(item => item.id)
 }
 
 // 新增
 const handleAdd = () => {
   dialogType.value = 'add'
-  Object.assign(formData, { name: '', description: '', status: 1 })
+  Object.assign(formData, { moduleName: '', description: '', status: 1 })
   dialogVisible.value = true
 }
 
@@ -285,81 +251,135 @@ const handleToggleStatus = async (row) => {
   const newStatus = row.status === 1 ? 0 : 1
   const statusText = newStatus === 1 ? '启用' : '禁用'
   try {
-    if (editingModule.value) {
-      await moduleAPI.update(editingModule.value.id, form.value)
-      showMessage('模块更新成功', 'success')
-    } else {
-      await moduleAPI.create(form.value)
-      showMessage('模块创建成功', 'success')
+    await ElMessageBox.confirm(`确定要${statusText}该模块吗？`, '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await api.update(row.id, { ...row, status: newStatus })
+    ElMessage.success(`${statusText}成功`)
+    loadData()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('操作失败')
     }
-    closeModal()
-    loadModules()
-  } catch (error) {
-    showMessage(error.response?.data?.message || '操作失败', 'error')
   }
 }
 
-const deleteModule = async (id) => {
-  if (!confirm('确定要删除这个模块吗？')) return
+// 删除
+const handleDelete = async (id) => {
   try {
-    await moduleAPI.delete(id)
-    showMessage('模块删除成功', 'success')
-    loadModules()
+    await api.delete(id)
+    ElMessage.success('删除成功')
+    loadData()
   } catch (error) {
-    showMessage('删除失败', 'error')
+    ElMessage.error('删除失败')
   }
 }
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('zh-CN')
+// 批量删除
+const handleBatchDelete = async () => {
+  try {
+    await ElMessageBox.confirm(`确定要删除选中的 ${selectedIds.value.length} 个模块吗？`, '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    for (const id of selectedIds.value) {
+      await api.delete(id)
+    }
+    ElMessage.success('批量删除成功')
+    loadData()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败')
+    }
+  }
 }
 
-const showMessage = (msg, type = 'success') => {
-  message.value = msg
-  messageType.value = type
-  setTimeout(() => {
-    message.value = ''
-  }, 3000)
+// 提交表单
+const handleSubmit = async () => {
+  try {
+    await formRef.value.validate()
+    submitLoading.value = true
+    if (dialogType.value === 'add') {
+      await api.create(formData)
+      ElMessage.success('新增成功')
+    } else {
+      await api.update(formData.id, formData)
+      ElMessage.success('更新成功')
+    }
+    dialogVisible.value = false
+    loadData()
+  } catch (error) {
+    if (error !== false) {
+      ElMessage.error('操作失败')
+    }
+  } finally {
+    submitLoading.value = false
+  }
+}
+
+// 分页大小变化
+const handleSizeChange = () => {
+  pagination.page = 1
+  loadData()
+}
+
+// 页码变化
+const handlePageChange = () => {
+  loadData()
 }
 
 onMounted(() => {
-  loadModules()
+  loadData()
 })
 </script>
 
 <style scoped>
+.page-container {
+  padding: 0;
+}
+
+.page-header {
+  margin-bottom: 20px;
+}
+
+.page-title {
+  margin: 10px 0 0 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.search-card {
+  margin-bottom: 20px;
+}
+
+.search-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.table-card {
+  margin-bottom: 20px;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
 }
 
-.card-header h2 {
-  margin: 0;
-  color: #2d3748;
+.header-actions {
+  display: flex;
+  gap: 10px;
 }
 
-.btn-sm {
-  padding: 6px 12px;
-  font-size: 12px;
-}
-
-.badge-success {
-  padding: 4px 8px;
-  background: #c6f6d5;
-  color: #22543d;
-  border-radius: 4px;
-  font-size: 12px;
-}
-
-.badge-danger {
-  padding: 4px 8px;
-  background: #fed7d7;
-  color: #742a2a;
-  border-radius: 4px;
-  font-size: 12px;
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>
-
