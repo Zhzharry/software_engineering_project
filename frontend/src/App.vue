@@ -1,9 +1,9 @@
 <template>
-  <Layout />
+  <router-view />
 </template>
 
 <script setup>
-import Layout from './components/Layout.vue'
+// App.vue 只负责路由视图，路由守卫在 router/index.js 中处理
 </script>
 
 <style>

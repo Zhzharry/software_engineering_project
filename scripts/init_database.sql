@@ -27,6 +27,7 @@ DROP TABLE IF EXISTS `user`;
 CREATE TABLE `user` (
     `id` BIGINT(20) NOT NULL AUTO_INCREMENT COMMENT '用户ID',
     `username` VARCHAR(255) NOT NULL COMMENT '用户名',
+    `password` VARCHAR(255) DEFAULT NULL COMMENT '密码',
     `email` VARCHAR(255) DEFAULT NULL COMMENT '邮箱',
     `phone` VARCHAR(20) DEFAULT NULL COMMENT '手机号',
     `status` INT(11) DEFAULT 1 COMMENT '状态：0-禁用，1-启用',

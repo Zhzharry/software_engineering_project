@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getToken, clearAuth } from '../utils/auth'
 
 const api = axios.create({
   baseURL: '/api',
@@ -6,6 +7,34 @@ const api = axios.create({
     'Content-Type': 'application/json'
   }
 })
+
+// 请求拦截器：添加token
+api.interceptors.request.use(
+  config => {
+    const token = getToken()
+    if (token) {
+      config.headers.Authorization = token
+    }
+    return config
+  },
+  error => {
+    return Promise.reject(error)
+  }
+)
+
+// 响应拦截器：处理401未授权
+api.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response && error.response.status === 401) {
+      // 清除本地认证信息
+      clearAuth()
+      // 跳转到登录页
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
 
 // 用户相关API
 export const userAPI = {
@@ -200,6 +229,13 @@ export const mapAPI = {
     return api.get(`/map/timeline${queryString ? '?' + queryString : ''}`)
   },
   getMapOverview: () => api.get('/map/overview')
+}
+
+// 认证相关API
+export const authAPI = {
+  login: (username, phone) => api.post('/auth/login', { username, phone }),
+  logout: () => api.post('/auth/logout'),
+  getCurrentUser: () => api.get('/auth/current-user')
 }
 
 export default api

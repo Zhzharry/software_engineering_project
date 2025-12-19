@@ -150,10 +150,9 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Delete, Edit } from '@element-plus/icons-vue'
 import { userAPI } from '../api'
-import { USE_MOCK, mockUserAPI } from '../mock'
 
-// 获取 API（根据配置选择 Mock 或真实 API）
-const api = USE_MOCK ? mockUserAPI : userAPI
+// 使用真实 API
+const api = userAPI
 
 // 搜索表单
 const searchForm = reactive({

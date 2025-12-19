@@ -253,10 +253,9 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Delete, View, Edit } from '@element-plus/icons-vue'
 import { processedDataAPI } from '../api'
-import { USE_MOCK, mockProcessedDataAPI } from '../mock'
 
-// 获取 API
-const api = USE_MOCK ? mockProcessedDataAPI : processedDataAPI
+// 使用真实 API
+const api = processedDataAPI
 
 // 处理类型选项
 const processTypes = ['数据清洗', '趋势分析', '风险评估', '路径预测', '数据融合', '异常检测']

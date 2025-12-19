@@ -191,10 +191,9 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Delete, View, Check } from '@element-plus/icons-vue'
 import { rawDataAPI } from '../api'
-import { USE_MOCK, mockRawDataAPI } from '../mock'
 
-// 获取 API
-const api = USE_MOCK ? mockRawDataAPI : rawDataAPI
+// 使用真实 API
+const api = rawDataAPI
 
 // 数据类型选项
 const dataTypes = ['地震数据', '洪水数据', '气象数据', '火灾数据', '泥石流数据', '台风数据']

@@ -10,16 +10,16 @@
       </div>
       <div class="header-right">
         <el-dropdown>
-          <span class="user-info">
+            <span class="user-info">
             <el-avatar :size="32" :icon="UserFilled" />
-            <span class="username">管理员</span>
+            <span class="username">{{ userInfo?.username || '管理员' }}</span>
             <el-icon><ArrowDown /></el-icon>
           </span>
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item :icon="User">个人中心</el-dropdown-item>
               <el-dropdown-item :icon="Setting">系统设置</el-dropdown-item>
-              <el-dropdown-item divided :icon="SwitchButton">退出登录</el-dropdown-item>
+              <el-dropdown-item divided :icon="SwitchButton" @click="handleLogout">退出登录</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -130,21 +130,54 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   User, Menu, Document, DataAnalysis, Notebook,
   UserFilled, ArrowDown, Setting, SwitchButton,
   Fold, Expand, Odometer, Warning, Search, DataLine,
   Folder, Files, Box, Delete, MapLocation
 } from '@element-plus/icons-vue'
+import { getUserInfo, clearAuth, isAuthenticated as checkAuth } from '../utils/auth'
+import { authAPI } from '../api/index'
 
 const route = useRoute()
+const router = useRouter()
 const isCollapse = ref(false)
 
 const activeMenu = computed(() => route.path)
+const userInfo = computed(() => getUserInfo())
+const isAuthenticated = computed(() => checkAuth())
 
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value
+}
+
+const handleLogout = async () => {
+  try {
+    await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+
+    // 调用退出登录接口
+    try {
+      await authAPI.logout()
+    } catch (error) {
+      console.error('退出登录接口调用失败:', error)
+    }
+
+    // 清除本地认证信息
+    clearAuth()
+
+    ElMessage.success('已退出登录')
+    
+    // 跳转到登录页
+    router.push('/login')
+  } catch (error) {
+    // 用户取消
+  }
 }
 </script>
 

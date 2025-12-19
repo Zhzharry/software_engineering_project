@@ -203,10 +203,9 @@ import {
   InfoFilled, WarningFilled, CircleCloseFilled
 } from '@element-plus/icons-vue'
 import { logDataAPI } from '../api'
-import { USE_MOCK, mockLogDataAPI } from '../mock'
 
-// 获取 API
-const api = USE_MOCK ? mockLogDataAPI : logDataAPI
+// 使用真实 API
+const api = logDataAPI
 
 // 搜索表单
 const searchForm = reactive({

@@ -516,13 +516,9 @@ const loadRecentActivities = async () => {
     }
   } catch (error) {
     console.error('加载最近活动失败:', error)
-    // 使用模拟数据
-    recentActivities.value = [
-      { type: 'create', action: '新增原始数据', detail: '地震监测数据', time: '2分钟前' },
-      { type: 'process', action: '数据处理完成', detail: '趋势分析', time: '5分钟前' },
-      { type: 'create', action: '文件上传', detail: '灾情图片.jpg', time: '10分钟前' },
-      { type: 'update', action: '更新处理数据', detail: '置信度调整为95%', time: '15分钟前' }
-    ]
+    ElMessage.error('加载最近活动失败')
+    // 如果接口失败，保持空数组，不显示模拟数据
+    recentActivities.value = []
   }
 }
 
