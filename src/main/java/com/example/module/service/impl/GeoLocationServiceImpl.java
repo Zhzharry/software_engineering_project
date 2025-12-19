@@ -23,10 +23,10 @@ import java.util.Map;
 @Service
 public class GeoLocationServiceImpl implements GeoLocationService {
 
-    @Value("${amap.api.key:514cde08eadb88096bcf0fe0a11f5e88}")
+    @Value("${amap.api.key:3f02caa01d89c1d4d03e88ee2259e2f7}")
     private String amapApiKey;
 
-    @Value("${amap.api.security:bed34790b035008203b5ea72cb23920d}")
+    @Value("${amap.api.security:}")
     private String amapSecurity;
 
     private final RestTemplate restTemplate = new RestTemplate();

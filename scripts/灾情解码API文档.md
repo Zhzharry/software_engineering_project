@@ -596,8 +596,8 @@ curl -X POST "http://localhost:8080/api/disaster-decode/file/decode-excel?idColu
 ```yaml
 amap:
   api:
-    key: 514cde08eadb88096bcf0fe0a11f5e88
-    security: bed34790b035008203b5ea72cb23920d
+    key: 667083e32d238add0a83812184ecb210
+    security: fd075bd4dc91d1b2215acd9d4f625ff5
 ```
 
 ## 九、注意事项

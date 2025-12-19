@@ -135,14 +135,15 @@ const categoryColors = {
 
 // 初始化地图
 const initMap = () => {
-  // 设置安全密钥
-  window._AMapSecurityConfig = {
-    securityJsCode: 'bed34790b035008203b5ea72cb23920d'
-  }
+  // 设置安全密钥（如果key是Web端类型，需要配置security）
+  // 如果是服务端key，可能不需要security，注释掉下面代码
+  // window._AMapSecurityConfig = {
+  //   securityJsCode: 'your-security-key-here'
+  // }
 
   // 加载高德地图脚本
   const script = document.createElement('script')
-  script.src = 'https://webapi.amap.com/maps?v=2.0&key=514cde08eadb88096bcf0fe0a11f5e88&plugin=AMap.MarkerCluster,AMap.HeatMap'
+  script.src = 'https://webapi.amap.com/maps?v=2.0&key=3f02caa01d89c1d4d03e88ee2259e2f7&plugin=AMap.MarkerCluster,AMap.HeatMap'
   script.onload = () => {
     createMap()
   }

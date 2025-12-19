@@ -51,5 +51,5 @@ file:
 # 高德地图API配置
 amap:
   api:
-    key: 514cde08eadb88096bcf0fe0a11f5e88
-    security: bed34790b035008203b5ea72cb23920d
+    key: 3f02caa01d89c1d4d03e88ee2259e2f7
+    security: ""  # 服务端API通常不需要security，如果前端需要请单独配置
