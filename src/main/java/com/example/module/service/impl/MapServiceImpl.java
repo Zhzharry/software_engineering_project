@@ -1,20 +1,17 @@
 package com.example.module.service.impl;
 
-import com.example.module.entity.mongodb.RawData;
-import com.example.module.repository.mongodb.RawDataRepository;
+import com.example.module.entity.mysql.RawData;
+import com.example.module.repository.mysql.MySqlRawDataRepository;
 import com.example.module.service.GeoLocationService;
 import com.example.module.service.MapService;
 import com.example.module.util.Result;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.Aggregation;
-import org.springframework.data.mongodb.core.aggregation.AggregationResults;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import javax.persistence.criteria.Predicate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -29,8 +26,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MapServiceImpl implements MapService {
 
-    private final RawDataRepository rawDataRepository;
-    private final MongoTemplate mongoTemplate;
+    private final MySqlRawDataRepository rawDataRepository;
     private final GeoLocationService geoLocationService;
 
     // 省份中心坐标缓存（简化版，实际可从数据库或配置加载）
@@ -72,23 +68,29 @@ public class MapServiceImpl implements MapService {
     @Override
     public Result<List<DisasterPoint>> getDisasterPoints(String disasterCategory, String source, String carrierType) {
         try {
-            Query query = new Query();
+            // 构建查询条件
+            Specification<RawData> spec = (root, query, cb) -> {
+                List<Predicate> predicates = new ArrayList<>();
+                
+                // 只查询有地理码的数据
+                predicates.add(cb.isNotNull(root.get("geoCode")));
+                predicates.add(cb.notEqual(root.get("geoCode"), ""));
+                
+                // 添加筛选条件
+                if (StringUtils.hasText(disasterCategory)) {
+                    predicates.add(cb.equal(root.get("disasterCategory"), disasterCategory));
+                }
+                if (StringUtils.hasText(source)) {
+                    predicates.add(cb.equal(root.get("sourceCategory"), source));
+                }
+                if (StringUtils.hasText(carrierType)) {
+                    predicates.add(cb.equal(root.get("carrierType"), carrierType));
+                }
+                
+                return cb.and(predicates.toArray(new Predicate[0]));
+            };
 
-            // 只查询有地理码的数据
-            query.addCriteria(Criteria.where("geo_code").exists(true).ne(null).ne(""));
-
-            // 添加筛选条件
-            if (StringUtils.hasText(disasterCategory)) {
-                query.addCriteria(Criteria.where("disaster_category").is(disasterCategory));
-            }
-            if (StringUtils.hasText(source)) {
-                query.addCriteria(Criteria.where("source_category").is(source));
-            }
-            if (StringUtils.hasText(carrierType)) {
-                query.addCriteria(Criteria.where("carrier_type").is(carrierType));
-            }
-
-            List<RawData> rawDataList = mongoTemplate.find(query, RawData.class);
+            List<RawData> rawDataList = rawDataRepository.findAll(spec);
             List<DisasterPoint> points = new ArrayList<>();
 
             for (RawData data : rawDataList) {
@@ -108,29 +110,29 @@ public class MapServiceImpl implements MapService {
     @Override
     public Result<List<RegionStatistics>> getRegionStatistics(String level) {
         try {
-            String groupField;
             int codeLength;
 
             switch (level != null ? level.toLowerCase() : "province") {
                 case "city":
-                    groupField = "cityCode";
                     codeLength = 4;
                     break;
                 case "district":
-                    groupField = "districtCode";
                     codeLength = 6;
                     break;
                 case "province":
                 default:
-                    groupField = "provinceCode";
                     codeLength = 2;
                     break;
             }
 
             // 查询所有有地理码的数据
-            Query query = new Query();
-            query.addCriteria(Criteria.where("geo_code").exists(true).ne(null).ne(""));
-            List<RawData> rawDataList = mongoTemplate.find(query, RawData.class);
+            Specification<RawData> spec = (root, query, cb) -> {
+                List<Predicate> predicates = new ArrayList<>();
+                predicates.add(cb.isNotNull(root.get("geoCode")));
+                predicates.add(cb.notEqual(root.get("geoCode"), ""));
+                return cb.and(predicates.toArray(new Predicate[0]));
+            };
+            List<RawData> rawDataList = rawDataRepository.findAll(spec);
 
             // 按区域分组统计
             Map<String, List<RawData>> regionGroups = new HashMap<>();
@@ -233,26 +235,34 @@ public class MapServiceImpl implements MapService {
     @Override
     public Result<List<TimelinePoint>> getTimelineData(String startTime, String endTime) {
         try {
-            Query query = new Query();
-            query.addCriteria(Criteria.where("geo_code").exists(true).ne(null).ne(""));
+            // 查询有地理码的数据
+            Specification<RawData> spec = (root, query, cb) -> {
+                List<Predicate> predicates = new ArrayList<>();
+                predicates.add(cb.isNotNull(root.get("geoCode")));
+                predicates.add(cb.notEqual(root.get("geoCode"), ""));
+                
+                // 时间范围筛选
+                if (StringUtils.hasText(startTime) && StringUtils.hasText(endTime)) {
+                    LocalDateTime start = LocalDateTime.parse(startTime, DateTimeFormatter.ISO_DATE_TIME);
+                    LocalDateTime end = LocalDateTime.parse(endTime, DateTimeFormatter.ISO_DATE_TIME);
+                    predicates.add(cb.isNotNull(root.get("disasterDateTime")));
+                    predicates.add(cb.greaterThanOrEqualTo(root.get("disasterDateTime"), start));
+                    predicates.add(cb.lessThanOrEqualTo(root.get("disasterDateTime"), end));
+                } else {
+                    predicates.add(cb.isNotNull(root.get("disasterDateTime")));
+                }
+                
+                return cb.and(predicates.toArray(new Predicate[0]));
+            };
 
-            // 时间范围筛选 - 合并为单个条件避免重复键错误
-            if (StringUtils.hasText(startTime) && StringUtils.hasText(endTime)) {
-                LocalDateTime start = LocalDateTime.parse(startTime, DateTimeFormatter.ISO_DATE_TIME);
-                LocalDateTime end = LocalDateTime.parse(endTime, DateTimeFormatter.ISO_DATE_TIME);
-                query.addCriteria(Criteria.where("disaster_date_time").exists(true).ne(null).gte(start).lte(end));
-            } else {
-                query.addCriteria(Criteria.where("disaster_date_time").exists(true).ne(null));
-            }
-
-            List<RawData> rawDataList = mongoTemplate.find(query, RawData.class);
+            List<RawData> rawDataList = rawDataRepository.findAll(spec);
             List<TimelinePoint> timelinePoints = new ArrayList<>();
 
             for (RawData data : rawDataList) {
                 DisasterPoint dp = convertToDisasterPoint(data);
                 if (dp != null && dp.getLongitude() != null && dp.getLatitude() != null) {
                     TimelinePoint tp = new TimelinePoint();
-                    tp.setId(data.getId());
+                    tp.setId(String.valueOf(data.getId())); // MySQL的ID是Long类型，转换为String
                     tp.setLongitude(dp.getLongitude());
                     tp.setLatitude(dp.getLatitude());
                     tp.setDisasterCategory(data.getDisasterCategory());
@@ -283,9 +293,13 @@ public class MapServiceImpl implements MapService {
             MapOverview overview = new MapOverview();
 
             // 查询有地理码的数据
-            Query query = new Query();
-            query.addCriteria(Criteria.where("geo_code").exists(true).ne(null).ne(""));
-            List<RawData> rawDataList = mongoTemplate.find(query, RawData.class);
+            Specification<RawData> spec = (root, query, cb) -> {
+                List<Predicate> predicates = new ArrayList<>();
+                predicates.add(cb.isNotNull(root.get("geoCode")));
+                predicates.add(cb.notEqual(root.get("geoCode"), ""));
+                return cb.and(predicates.toArray(new Predicate[0]));
+            };
+            List<RawData> rawDataList = rawDataRepository.findAll(spec);
 
             overview.setTotalPoints(rawDataList.size());
 
@@ -350,7 +364,7 @@ public class MapServiceImpl implements MapService {
         }
 
         DisasterPoint point = new DisasterPoint();
-        point.setId(data.getId());
+        point.setId(String.valueOf(data.getId())); // MySQL的ID是Long类型，转换为String
         point.setGeoCode(data.getGeoCode());
         point.setDisasterCategory(data.getDisasterCategory());
         point.setDisasterSubcategory(data.getDisasterSubcategory());

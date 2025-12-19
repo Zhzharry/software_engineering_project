@@ -1,6 +1,6 @@
 package com.example.module.controller;
 
-import com.example.module.entity.mongodb.RawData;
+import com.example.module.entity.mysql.RawData;
 import com.example.module.service.RawDataService;
 import com.example.module.util.Result;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +28,7 @@ public class RawDataController {
     }
 
     @GetMapping("/{id}")
-    public Result<RawData> getRawDataById(@PathVariable String id) {
+    public Result<RawData> getRawDataById(@PathVariable Long id) {
         return rawDataService.getRawDataById(id);
     }
 
@@ -50,12 +50,27 @@ public class RawDataController {
     }
 
     @PutMapping("/{id}/processed")
-    public Result<Boolean> markAsProcessed(@PathVariable String id) {
+    public Result<Boolean> markAsProcessed(@PathVariable Long id) {
         return rawDataService.markAsProcessed(id);
     }
 
     @GetMapping("/count/{dataType}")
     public Result<Long> getDataCountByType(@PathVariable String dataType) {
         return rawDataService.getDataCountByType(dataType);
+    }
+
+    @GetMapping("/disaster-category/{disasterCategory}")
+    public Result<List<RawData>> getRawDataByDisasterCategory(@PathVariable String disasterCategory) {
+        return rawDataService.getRawDataByDisasterCategory(disasterCategory);
+    }
+
+    @DeleteMapping("/{id}")
+    public Result<Boolean> deleteRawData(@PathVariable Long id) {
+        return rawDataService.deleteRawData(id);
+    }
+
+    @PutMapping("/{id}")
+    public Result<RawData> updateRawData(@PathVariable Long id, @RequestBody RawData rawData) {
+        return rawDataService.updateRawData(id, rawData);
     }
 }

@@ -1,6 +1,6 @@
 package com.example.module.service;
 
-import com.example.module.entity.mongodb.RawData;
+import com.example.module.entity.mysql.RawData;
 import com.example.module.util.DecodedId;
 import com.example.module.util.Result;
 
@@ -73,10 +73,10 @@ public interface DisasterDataQueryService {
     /**
      * 获取解码后的数据详情（包含解码信息）
      * 
-     * @param id 数据ID
+     * @param id 数据ID (Long类型，MySQL主键)
      * @return 包含解码信息的数据对象
      */
-    Result<DisasterDataDetail> getDataDetailWithDecode(String id);
+    Result<DisasterDataDetail> getDataDetailWithDecode(Long id);
 
     /**
      * 查询参数类

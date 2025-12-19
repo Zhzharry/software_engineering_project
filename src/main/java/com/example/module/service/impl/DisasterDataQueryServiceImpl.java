@@ -1,18 +1,21 @@
 package com.example.module.service.impl;
 
-import com.example.module.entity.mongodb.RawData;
-import com.example.module.repository.mongodb.RawDataRepository;
+import com.example.module.entity.mysql.RawData;
+import com.example.module.repository.mysql.MySqlRawDataRepository;
 import com.example.module.service.DisasterDataQueryService;
 import com.example.module.service.DisasterDecodeService;
 import com.example.module.util.DecodedId;
 import com.example.module.util.Result;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
+import javax.persistence.criteria.Predicate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,9 +29,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class DisasterDataQueryServiceImpl implements DisasterDataQueryService {
 
-    private final RawDataRepository rawDataRepository;
+    private final MySqlRawDataRepository rawDataRepository;
     private final DisasterDecodeService disasterDecodeService;
-    private final MongoTemplate mongoTemplate;
 
     @Override
     public Result<List<RawData>> queryByDisasterCategory(String category) {
@@ -55,7 +57,7 @@ public class DisasterDataQueryServiceImpl implements DisasterDataQueryService {
     @Override
     public Result<List<RawData>> queryBySource(String source) {
         try {
-            List<RawData> dataList = rawDataRepository.findBySourceSubcategory(source);
+            List<RawData> dataList = rawDataRepository.findBySourceCategory(source);
             return Result.success(dataList);
         } catch (Exception e) {
             log.error("根据来源查询失败: {}", e.getMessage());
@@ -99,52 +101,57 @@ public class DisasterDataQueryServiceImpl implements DisasterDataQueryService {
     @Override
     public Result<List<RawData>> queryByMultipleConditions(DisasterQueryParams queryParams) {
         try {
-            // 使用MongoTemplate构建查询，正确处理@Field注解的字段名
-            Query query = new Query();
+            // 使用JPA Specification构建查询
+            Specification<RawData> spec = (root, query, cb) -> {
+                List<Predicate> predicates = new ArrayList<>();
 
-            // 添加查询条件（使用MongoDB文档中的实际字段名）
-            if (queryParams.getDisasterCategory() != null && !queryParams.getDisasterCategory().isEmpty()) {
-                query.addCriteria(Criteria.where("disaster_category").is(queryParams.getDisasterCategory()));
-            }
-            if (queryParams.getDisasterSubcategory() != null && !queryParams.getDisasterSubcategory().isEmpty()) {
-                query.addCriteria(Criteria.where("disaster_subcategory").is(queryParams.getDisasterSubcategory()));
-            }
-            if (queryParams.getSource() != null && !queryParams.getSource().isEmpty()) {
-                query.addCriteria(Criteria.where("source_subcategory").is(queryParams.getSource()));
-            }
-            if (queryParams.getCarrierType() != null && !queryParams.getCarrierType().isEmpty()) {
-                query.addCriteria(Criteria.where("carrier_type").is(queryParams.getCarrierType()));
-            }
-            if (queryParams.getGeoCode() != null && !queryParams.getGeoCode().isEmpty()) {
-                // 支持地理码前缀匹配
-                query.addCriteria(Criteria.where("geo_code").regex("^" + queryParams.getGeoCode()));
-            }
+                // 添加查询条件（只有当条件不为空时才添加）
+                if (StringUtils.hasText(queryParams.getDisasterCategory())) {
+                    predicates.add(cb.equal(root.get("disasterCategory"), queryParams.getDisasterCategory()));
+                }
+                if (StringUtils.hasText(queryParams.getDisasterSubcategory())) {
+                    predicates.add(cb.equal(root.get("disasterSubcategory"), queryParams.getDisasterSubcategory()));
+                }
+                if (StringUtils.hasText(queryParams.getSource())) {
+                    predicates.add(cb.equal(root.get("sourceCategory"), queryParams.getSource()));
+                }
+                if (StringUtils.hasText(queryParams.getCarrierType())) {
+                    predicates.add(cb.equal(root.get("carrierType"), queryParams.getCarrierType()));
+                }
+                if (StringUtils.hasText(queryParams.getGeoCode())) {
+                    // 支持地理码前缀匹配（使用LIKE）
+                    predicates.add(cb.like(root.get("geoCode"), queryParams.getGeoCode() + "%"));
+                }
 
-            // 时间范围查询
-            if (queryParams.getStartTime() != null && queryParams.getEndTime() != null) {
-                query.addCriteria(Criteria.where("disaster_date_time")
-                        .gte(queryParams.getStartTime())
-                        .lte(queryParams.getEndTime()));
-            } else if (queryParams.getStartTime() != null) {
-                query.addCriteria(Criteria.where("disaster_date_time").gte(queryParams.getStartTime()));
-            } else if (queryParams.getEndTime() != null) {
-                query.addCriteria(Criteria.where("disaster_date_time").lte(queryParams.getEndTime()));
-            }
+                // 时间范围查询
+                if (queryParams.getStartTime() != null && queryParams.getEndTime() != null) {
+                    predicates.add(cb.between(root.get("disasterDateTime"), 
+                            queryParams.getStartTime(), queryParams.getEndTime()));
+                } else if (queryParams.getStartTime() != null) {
+                    predicates.add(cb.greaterThanOrEqualTo(root.get("disasterDateTime"), queryParams.getStartTime()));
+                } else if (queryParams.getEndTime() != null) {
+                    predicates.add(cb.lessThanOrEqualTo(root.get("disasterDateTime"), queryParams.getEndTime()));
+                }
 
-            // 执行查询
-            List<RawData> dataList = mongoTemplate.find(query, RawData.class);
+                // 如果没有查询条件，返回所有数据
+                if (predicates.isEmpty()) {
+                    return cb.conjunction(); // 返回true条件，即查询所有
+                }
+                
+                return cb.and(predicates.toArray(new Predicate[0]));
+            };
 
             // 分页处理
+            List<RawData> dataList;
             if (queryParams.getPage() != null && queryParams.getSize() != null) {
                 int page = queryParams.getPage() > 0 ? queryParams.getPage() - 1 : 0;
                 int size = queryParams.getSize() > 0 ? queryParams.getSize() : 10;
-                int start = page * size;
-                int end = Math.min(start + size, dataList.size());
-                if (start < dataList.size()) {
-                    dataList = dataList.subList(start, end);
-                } else {
-                    dataList = new ArrayList<>();
-                }
+                Pageable pageable = PageRequest.of(page, size);
+                Page<RawData> pageResult = rawDataRepository.findAll(spec, pageable);
+                dataList = pageResult.getContent();
+            } else {
+                // 不分页，返回所有数据
+                dataList = rawDataRepository.findAll(spec);
             }
 
             return Result.success(dataList);
@@ -155,7 +162,7 @@ public class DisasterDataQueryServiceImpl implements DisasterDataQueryService {
     }
 
     @Override
-    public Result<DisasterDataDetail> getDataDetailWithDecode(String id) {
+    public Result<DisasterDataDetail> getDataDetailWithDecode(Long id) {
         try {
             Optional<RawData> rawDataOpt = rawDataRepository.findById(id);
             if (!rawDataOpt.isPresent()) {

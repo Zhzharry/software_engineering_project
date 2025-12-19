@@ -135,38 +135,169 @@ const categoryColors = {
 
 // 初始化地图
 const initMap = () => {
-  // 设置安全密钥（如果key是Web端类型，需要配置security）
-  // 如果是服务端key，可能不需要security，注释掉下面代码
-  // window._AMapSecurityConfig = {
-  //   securityJsCode: 'your-security-key-here'
-  // }
+  console.log('开始初始化地图...')
+  
+  // 检查是否已经加载过高德地图脚本
+  if (window.AMap) {
+    console.log('AMap对象已存在，直接创建地图')
+    createMap()
+    return
+  }
 
+  // 检查是否正在加载
+  const existingScript = document.querySelector('script[src*="webapi.amap.com"]')
+  if (existingScript) {
+    console.log('地图脚本已存在，等待AMap对象初始化...')
+    // 如果脚本已存在但AMap未加载，等待加载完成
+    let checkCount = 0
+    const maxChecks = 100 // 最多检查10秒
+    const checkAMap = setInterval(() => {
+      checkCount++
+      if (window.AMap) {
+        console.log('AMap对象初始化成功')
+        clearInterval(checkAMap)
+        createMap()
+      } else if (checkCount >= maxChecks) {
+        console.error('等待AMap对象超时')
+        clearInterval(checkAMap)
+        ElMessage.error('地图加载超时，请刷新页面重试')
+      }
+    }, 100)
+    return
+  }
+
+  // 设置安全密钥（Web端API需要配置安全密钥）
+  // 前端使用Web端（JS API）类型的密钥
+  window._AMapSecurityConfig = {
+    securityJsCode: 'fd075bd4dc91d1b2215acd9d4f625ff5' // 前端API的安全密钥
+  }
+
+  console.log('开始加载高德地图脚本...')
+  
   // 加载高德地图脚本
   const script = document.createElement('script')
-  script.src = 'https://webapi.amap.com/maps?v=2.0&key=3f02caa01d89c1d4d03e88ee2259e2f7&plugin=AMap.MarkerCluster,AMap.HeatMap'
+  script.type = 'text/javascript'
+  script.async = true
+  script.defer = true
+  
+  // 使用前端Web端（JS API）类型的密钥
+  // 注意：这个密钥专门用于前端地图显示，不能用于后端服务
+  const apiKey = '667083e32d238add0a83812184ecb210' // 前端Web端API密钥
+  script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}&plugin=AMap.MarkerCluster,AMap.HeatMap,AMap.Geocoder`
+  
   script.onload = () => {
-    createMap()
+    console.log('高德地图脚本加载成功，等待AMap对象初始化...')
+    // 等待AMap对象完全初始化
+    let checkCount = 0
+    const maxChecks = 50 // 最多检查5秒
+    const checkAMap = setInterval(() => {
+      checkCount++
+      if (window.AMap) {
+        console.log('AMap对象初始化成功，开始创建地图实例')
+        clearInterval(checkAMap)
+        createMap()
+      } else if (checkCount >= maxChecks) {
+        console.error('AMap对象初始化超时')
+        clearInterval(checkAMap)
+        ElMessage.error('地图初始化失败：AMap对象未找到。请检查API密钥是否正确')
+      }
+    }, 100)
   }
-  script.onerror = () => {
-    ElMessage.error('地图加载失败')
+  
+  script.onerror = (error) => {
+    console.error('地图脚本加载失败:', error)
+    console.error('失败详情:', {
+      src: script.src,
+      readyState: script.readyState,
+      error: error
+    })
+    ElMessage.error('地图脚本加载失败，可能的原因：1. 网络连接问题 2. API密钥无效 3. 跨域限制。请检查浏览器控制台获取详细信息')
   }
+  
+  // 添加脚本到页面
   document.head.appendChild(script)
+  console.log('地图脚本已添加到页面，URL:', script.src)
 }
 
 // 创建地图实例
 const createMap = () => {
-  map = new AMap.Map('amap-container', {
-    zoom: 5,
-    center: [104.065735, 35.738353], // 中国中心点
-    mapStyle: 'amap://styles/light',
-    resizeEnable: true
-  })
+  try {
+    // 确保容器存在且有高度
+    const container = document.getElementById('amap-container')
+    if (!container) {
+      console.error('地图容器不存在')
+      ElMessage.error('地图容器不存在')
+      return
+    }
 
-  // 地图加载完成后加载数据
-  map.on('complete', () => {
-    loadOverview()
-    loadDisasterPoints()
-  })
+    // 如果容器没有高度，设置默认高度
+    if (!container.offsetHeight || container.offsetHeight < 100) {
+      const parentHeight = container.parentElement?.offsetHeight || 600
+      container.style.height = `${Math.max(parentHeight - 20, 600)}px`
+      console.warn('地图容器高度不足，已设置高度:', container.style.height)
+    }
+
+    console.log('开始创建地图实例')
+    console.log('容器信息:', {
+      id: container.id,
+      width: container.offsetWidth,
+      height: container.offsetHeight,
+      parentWidth: container.parentElement?.offsetWidth,
+      parentHeight: container.parentElement?.offsetHeight
+    })
+
+    // 检查AMap对象
+    if (!window.AMap) {
+      console.error('AMap对象不存在，无法创建地图')
+      ElMessage.error('地图API未加载，请刷新页面重试')
+      return
+    }
+
+    // 创建地图实例
+    map = new window.AMap.Map('amap-container', {
+      zoom: 5,
+      center: [104.065735, 35.738353], // 中国中心点（经度，纬度）
+      mapStyle: 'amap://styles/light',
+      resizeEnable: true,
+      viewMode: '2D', // 使用2D视图（3D可能在某些情况下不兼容）
+      lang: 'zh_cn' // 中文
+    })
+
+    console.log('地图实例创建成功')
+
+    // 地图加载完成后加载数据
+    map.on('complete', () => {
+      console.log('地图加载完成，开始加载数据')
+      loadOverview()
+      loadDisasterPoints()
+    })
+
+    // 监听地图错误
+    map.on('error', (error) => {
+      console.error('地图错误:', error)
+      const errorMsg = error?.message || error?.toString() || '未知错误'
+      console.error('错误详情:', error)
+      
+      // 根据错误类型给出提示
+      if (errorMsg.includes('USERKEY_PLAT_NOMATCH')) {
+        ElMessage.error('API密钥平台类型不匹配，请使用Web端（JS API）类型的密钥')
+      } else if (errorMsg.includes('INVALID_USER_KEY')) {
+        ElMessage.error('API密钥无效，请检查密钥是否正确')
+      } else {
+        ElMessage.error('地图加载出错: ' + errorMsg)
+      }
+    })
+
+    // 监听地图加载进度
+    map.on('load', () => {
+      console.log('地图瓦片加载完成')
+    })
+
+  } catch (error) {
+    console.error('创建地图实例失败:', error)
+    console.error('错误堆栈:', error.stack)
+    ElMessage.error('创建地图失败: ' + (error.message || error.toString()))
+  }
 }
 
 // 加载概览数据
@@ -377,7 +508,31 @@ watch(viewMode, () => {
 })
 
 onMounted(() => {
-  initMap()
+  console.log('MapVisualization组件已挂载')
+  console.log('容器元素:', document.getElementById('amap-container'))
+  
+  // 确保DOM完全渲染后再初始化地图
+  // 使用nextTick确保Vue完成DOM更新
+  setTimeout(() => {
+    const container = document.getElementById('amap-container')
+    if (container) {
+      console.log('容器已找到，开始初始化地图')
+      initMap()
+    } else {
+      console.error('容器未找到，延迟重试...')
+      // 如果容器还没准备好，再等一会儿
+      setTimeout(() => {
+        const retryContainer = document.getElementById('amap-container')
+        if (retryContainer) {
+          console.log('容器已找到（重试），开始初始化地图')
+          initMap()
+        } else {
+          console.error('容器仍未找到，请检查DOM结构')
+          ElMessage.error('地图容器未找到，请刷新页面')
+        }
+      }, 500)
+    }
+  }, 200)
 })
 
 onUnmounted(() => {
@@ -391,9 +546,12 @@ onUnmounted(() => {
 
 <style scoped>
 .map-visualization {
-  height: 100%;
+  height: calc(100vh - 120px);
+  min-height: 600px;
   display: flex;
   flex-direction: column;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .toolbar-card {
@@ -423,12 +581,13 @@ onUnmounted(() => {
   border-radius: 4px;
   overflow: hidden;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  min-height: 600px;
 }
 
 #amap-container {
   width: 100%;
   height: 100%;
-  min-height: 500px;
+  min-height: 600px;
 }
 
 .info-panel {

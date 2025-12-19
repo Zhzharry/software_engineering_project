@@ -18,8 +18,35 @@ public class RawData {
     @Column(name = "data_type")
     private String dataType;
     
+    @Column(name = "disaster_category")
+    private String disasterCategory;
+    
+    @Column(name = "disaster_subcategory")
+    private String disasterSubcategory;
+    
+    @Column(name = "disaster_indicator")
+    private String disasterIndicator;
+    
+    @Column(name = "geo_code", length = 12)
+    private String geoCode;
+    
+    @Column(name = "disaster_id", length = 36)
+    private String disasterId;
+    
+    @Column(name = "disaster_date_time")
+    private LocalDateTime disasterDateTime;
+    
     @Column(name = "source_system")
     private String sourceSystem;
+    
+    @Column(name = "source_category")
+    private String sourceCategory;
+    
+    @Column(name = "carrier_type")
+    private String carrierType;
+    
+    @Column(name = "decoded_description", columnDefinition = "TEXT")
+    private String decodedDescription;
     
     @Column(name = "create_time")
     private LocalDateTime createTime;
@@ -29,6 +56,9 @@ public class RawData {
     
     @Column(name = "status")
     private Integer status;
+    
+    @Column(name = "processed")
+    private Boolean processed;
     
     @PrePersist
     protected void onCreate() {

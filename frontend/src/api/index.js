@@ -65,11 +65,14 @@ export const rawDataAPI = {
   getAll: () => api.get('/raw-data'),
   getById: (id) => api.get(`/raw-data/${id}`),
   getByType: (type) => api.get(`/raw-data/type/${type}`),
+  getByDisasterCategory: (category) => api.get(`/raw-data/disaster-category/${encodeURIComponent(category)}`),
   getUnprocessed: () => api.get('/raw-data/unprocessed'),
   getTimeRange: (start, end) => api.get(`/raw-data/time-range?start=${start}&end=${end}`),
   getCountByType: (type) => api.get(`/raw-data/count/${type}`),
   create: (data) => api.post('/raw-data', data),
-  markAsProcessed: (id) => api.put(`/raw-data/${id}/processed`)
+  update: (id, data) => api.put(`/raw-data/${id}`, data),
+  markAsProcessed: (id) => api.put(`/raw-data/${id}/processed`),
+  delete: (id) => api.delete(`/raw-data/${id}`)
 }
 
 // 日志数据相关API

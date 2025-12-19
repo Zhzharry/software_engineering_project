@@ -68,9 +68,15 @@
       </template>
 
       <el-table :data="tableData" style="width: 100%" row-key="id" @row-click="handleRowClick">
-        <el-table-column prop="disasterId" label="灾情ID" width="150" show-overflow-tooltip>
+        <!-- 按照数据库列顺序排列 -->
+        <el-table-column prop="id" label="ID" width="120" fixed="left">
           <template #default="{ row }">
-            <el-text type="primary" truncated>{{ row.disasterId || row.id }}</el-text>
+            <el-text type="primary" truncated>{{ String(row.id) }}</el-text>
+          </template>
+        </el-table-column>
+        <el-table-column prop="dataType" label="数据类型" width="120">
+          <template #default="{ row }">
+            {{ row.dataType || '-' }}
           </template>
         </el-table-column>
         <el-table-column prop="disasterCategory" label="灾害大类" width="130">
@@ -80,23 +86,63 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="disasterSubcategory" label="灾害子类" width="100" />
-        <el-table-column prop="disasterIndicator" label="灾情指标" width="120" show-overflow-tooltip />
-        <el-table-column prop="sourceCategory" label="来源" width="100" />
-        <el-table-column prop="carrierType" label="载体" width="80">
+        <el-table-column prop="disasterSubcategory" label="灾害子类" width="100">
+          <template #default="{ row }">
+            {{ row.disasterSubcategory || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="disasterIndicator" label="灾情指标" width="120" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.disasterIndicator || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="geoCode" label="地理码" width="130">
+          <template #default="{ row }">
+            {{ row.geoCode || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="disasterId" label="灾情ID" width="150" show-overflow-tooltip>
+          <template #default="{ row }">
+            <el-text type="primary" truncated>{{ row.disasterId || '-' }}</el-text>
+          </template>
+        </el-table-column>
+        <el-table-column prop="disasterDateTime" label="灾情时间" width="170">
+          <template #default="{ row }">
+            {{ formatTime(row.disasterDateTime) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="sourceSystem" label="来源系统" width="120">
+          <template #default="{ row }">
+            {{ row.sourceSystem || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="sourceCategory" label="来源类别" width="100">
+          <template #default="{ row }">
+            {{ row.sourceCategory || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="carrierType" label="载体类型" width="80">
           <template #default="{ row }">
             <el-tag :type="getCarrierTagType(row.carrierType)" size="small">
               {{ row.carrierType || '-' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="geoCode" label="地理码" width="130" />
-        <el-table-column prop="disasterDateTime" label="发生时间" width="170">
+        <el-table-column prop="decodedDescription" label="解码描述" min-width="200" show-overflow-tooltip>
           <template #default="{ row }">
-            {{ formatTime(row.disasterDateTime) }}
+            {{ row.decodedDescription || row.dataContent || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="decodedDescription" label="描述" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="createTime" label="创建时间" width="170">
+          <template #default="{ row }">
+            {{ formatTime(row.createTime) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="updateTime" label="更新时间" width="170">
+          <template #default="{ row }">
+            {{ formatTime(row.updateTime) }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link @click.stop="showDetail(row)">
@@ -233,13 +279,30 @@ const loadData = async () => {
 
     const res = await disasterDataAPI.query(params)
     if (res.data?.code === 200) {
-      tableData.value = res.data.data || []
-      pagination.total = tableData.value.length
+      const responseData = res.data.data
+      // 后端返回的是包含data和total的对象
+      if (responseData && typeof responseData === 'object' && 'data' in responseData) {
+        tableData.value = responseData.data || []
+        pagination.total = responseData.total || 0
+      } else {
+        // 兼容旧格式：直接返回数组
+        const data = Array.isArray(responseData) ? responseData : []
+        tableData.value = data
+        pagination.total = data.length
+      }
+      
+      // 调试信息：打印返回的数据
+      console.log('查询返回的数据:', tableData.value)
+      console.log('数据条数:', tableData.value.length)
+      if (tableData.value.length > 0) {
+        console.log('第一条数据:', tableData.value[0])
+      }
     } else {
       ElMessage.error(res.data?.message || '加载数据失败')
     }
   } catch (error) {
     console.error('加载数据失败:', error)
+    console.error('错误详情:', error.response?.data || error.message)
     ElMessage.error('加载数据失败')
   } finally {
     loading.value = false
@@ -281,7 +344,9 @@ const handleRowClick = (row) => {
 // 显示详情
 const showDetail = async (row) => {
   try {
-    const res = await disasterDataAPI.getDetail(row.id)
+    // MySQL的ID是Long类型，需要确保传递正确的ID
+    const id = row.id || row.rawData?.id
+    const res = await disasterDataAPI.getDetail(id)
     if (res.data?.code === 200) {
       detailData.value = res.data.data
       detailTab.value = 'basic'

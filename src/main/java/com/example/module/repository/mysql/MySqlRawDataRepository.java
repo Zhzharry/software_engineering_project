@@ -22,4 +22,34 @@ public interface MySqlRawDataRepository extends JpaRepository<RawData, Long>, Jp
     
     @Query("SELECT r FROM RawData r WHERE r.dataContent LIKE %:keyword%")
     List<RawData> findByDataContentContaining(@Param("keyword") String keyword);
+    
+    // 按灾情类别查询
+    List<RawData> findByDisasterCategory(String disasterCategory);
+    
+    // 按处理状态查询
+    @Query("SELECT r FROM RawData r WHERE r.processed = :processed")
+    List<RawData> findByProcessed(@Param("processed") Boolean processed);
+    
+    // 按状态查询
+    List<RawData> findByStatus(Integer status);
+    
+    // 统计数据类型数量
+    long countByDataType(String dataType);
+    
+    // 按灾情子类查询
+    List<RawData> findByDisasterSubcategory(String disasterSubcategory);
+    
+    // 按来源类别查询
+    List<RawData> findBySourceCategory(String sourceCategory);
+    
+    // 按载体类型查询
+    List<RawData> findByCarrierType(String carrierType);
+    
+    // 按地理码查询
+    List<RawData> findByGeoCode(String geoCode);
+    
+    // 按灾情发生时间范围查询
+    @Query("SELECT r FROM RawData r WHERE r.disasterDateTime BETWEEN :startTime AND :endTime")
+    List<RawData> findByDisasterDateTimeBetween(@Param("startTime") LocalDateTime startTime, 
+                                                 @Param("endTime") LocalDateTime endTime);
 }
